@@ -1,0 +1,14 @@
+use <aaaa.cry>
+let y = x = 50 * x
+
+println(y)
+println(x)
+
+fn println(v) {
+    *v
+    *"\n"
+    return 5
+}
+
+let z = println("Yes")
+*z
