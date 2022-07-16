@@ -8,7 +8,7 @@ let correct_number = randrange(0, 100) as integer
 while true {
     let guess = read() as integer
     print("You guessed " + guess + " and it was... ")
-    return if guess < correct_number {
+    if guess < correct_number {
         println("TOO SMALL!")
     } else if guess > correct_number {
         println("TOO BIG!")
