@@ -1,0 +1,5 @@
+x()
+
+fn x() {
+    println("Hello!")
+}

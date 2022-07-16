@@ -1,13 +1,14 @@
 use core::panic;
-use std::mem::{discriminant, Discriminant};
+use std::{mem::{discriminant, Discriminant}, env};
 
-use crate::{lexer::tokens::{Token, TokenKind, self}, exceptions::{parser_errors::{UnterminatedParenthesis, InvalidSyntaxExpected, FailedToFindEndOfLine, CriticalError, InvalidSyntax, NewLineError}, Exception}, utils::{Position, FileData}};
+use crate::{lexer::tokens::{Token, TokenKind, self}, exceptions::{parser_errors::{UnterminatedParenthesis, InvalidSyntaxExpected, FailedToFindEndOfLine, CriticalError, InvalidSyntax, NewLineError}, Exception}, utils::{Position, FileData}, environment::ENV_DEV_DEBUG_PARSER};
 
-use self::instructions::{Instruction, BinaryOperator, InstructionKind, UnaryOperator, Literal};
+use self::instructions::{Instruction, BinaryOperator, InstructionKind, UnaryOperator, Literal, ConvertType};
 
 pub mod instructions;
 pub mod context;
 pub mod functions;
+pub mod built_in_functions;
 
 pub struct Parser<'a> {
     tokens: Vec<Token>,
@@ -18,7 +19,11 @@ pub struct Parser<'a> {
 impl<'a> Parser<'a> {
     pub fn new(tokens: Vec<Token>, file_data: &'a FileData) -> Self { Self { tokens, index: 0, file_data } }
     pub fn parse(&mut self) -> Vec<Instruction>{
-        self.parse_section()
+        let tokens = self.parse_section();
+        if env::var(ENV_DEV_DEBUG_PARSER).unwrap() == "true" {
+            println!("{}", tokens.iter().map(|i| format!("{}\n", i)).collect::<String>())
+        }
+        tokens
     }
 
     fn parse_section(&mut self) -> Vec<Instruction> {
@@ -29,23 +34,12 @@ impl<'a> Parser<'a> {
         while let Some(token) = self.current_token() {
             if token.kind == TokenKind::Dedent || token.kind == TokenKind::EndOfFile { break; }
             instructions.push(match &self.current_token_nc().kind {
-                TokenKind::Let => self.variable_assign(),
                 TokenKind::EndOfFile => break,
                 TokenKind::NewLine => { self.advance(); continue; },
-                TokenKind::If => self.if_statement(),
-                TokenKind::Multiply => {
-                    let start = self.current_token_nc().start_position.clone();
-                    self.advance();
-                    let expr = self.expr();
-                    Instruction::new(start, expr.end_position.clone(), InstructionKind::SystemOut { value: Box::new(expr) })
-                },
-                TokenKind::While => self.while_statement(),
-                TokenKind::Identifier(v) => self.found_identifier(),
                 TokenKind::Function => self.declare_function(),
-                TokenKind::Integer(_) | TokenKind::Float(_) => self.expr(),
                 TokenKind::Use => self.use_statement(),
-                TokenKind::Return => self.return_statement(),
-                _ => InvalidSyntax::new(self.current_token_nc().start_position.clone(), self.current_token_nc().end_position.clone(), self.file_data, "unexpected token found".to_string()).run()
+                _ => self.expr(),
+                // _ => InvalidSyntax::new(self.current_token_nc().start_position.clone(), self.current_token_nc().end_position.clone(), self.file_data, "unexpected token found".to_string()).run()
             });
         }
         self.advance();
@@ -68,7 +62,7 @@ impl<'a> Parser<'a> {
 
     #[inline(always)]
     fn current_token_nc(&self) -> &Token {
-        &self.tokens[self.index]
+        self.current_token().unwrap()
     }
     
     #[inline(always)]
@@ -162,7 +156,7 @@ impl<'a> Parser<'a> {
     }
 
     fn atom(&mut self) -> Instruction {
-        match self.current_token_nc().kind.clone() {
+        let a = match self.current_token_nc().kind.clone() {
             TokenKind::LeftParenthesis => {
                 let start = self.current_token_nc().start_position.clone();
                 self.advance();
@@ -170,6 +164,7 @@ impl<'a> Parser<'a> {
                 if self.current_token_nc().kind != TokenKind::RightParenthesis {
                     UnterminatedParenthesis::new(start, self.current_token_nc().end_position.clone(), self.file_data).run()
                 }
+                self.advance();
                 Instruction::new(
                     start,
                     self.current_token_nc().end_position.clone(),
@@ -187,17 +182,43 @@ impl<'a> Parser<'a> {
                 self.advance();
                 instr
             },
+            TokenKind::Let => self.variable_assign(),
+            TokenKind::While => self.while_statement(),
+            TokenKind::If => self.if_statement(),
             _ => {
                 let literal = Literal::from_token(self.current_token_nc(), self.file_data);
                 let instruction = Instruction::new(
                     self.current_token_nc().start_position.clone(),
                     self.current_token_nc().end_position.clone(),
-                    InstructionKind::Lit(literal)
+                    InstructionKind::Lit(literal),
                 );
                 self.advance();
                 instruction
             }
+        };
+        if &self.current_token_nc().kind == &TokenKind::As {
+            self.advance();
+            return Instruction::new(
+                a.start_position.clone(), 
+                self.current_token_nc().end_position.clone(), 
+                InstructionKind::ConvertType { 
+                    value: Box::new(a), 
+                    convert_to: match 
+                        match &self.current_token_nc().kind {
+                            TokenKind::Identifier(v) => v,
+                            _ => panic!("{}", self.current_token_nc().kind)
+                        }.as_str()
+                        {
+                        "integer" => ConvertType::Integer,
+                        "float" => ConvertType::Float,
+                        "string" => ConvertType::String,
+                        "bool" => ConvertType::Bool,
+                        _ => panic!()
+                        } 
+                }
+            )
         }
+        a
     }
 
     fn binary_operation(
@@ -245,7 +266,6 @@ impl<'a> Parser<'a> {
         self.advance();
         let expr = self.expr();
         let end = self.current_token_nc().end_position.clone();
-        if self.expect_multiple(&[TokenKind::NewLine, TokenKind::EndOfFile]) { NewLineError::new(start, end, self.file_data).run() }
         self.advance();
         Instruction::new(start, end, InstructionKind::VarAssign { identifier, value: Box::new(expr) })
     }
@@ -394,6 +414,7 @@ impl<'a> Parser<'a> {
                     if token.kind != TokenKind::If {
                         self.else_statement()
                     } else {
+                        self.advance();
                         self.if_statement_w_start(start)
                     }
                 } else {
@@ -476,7 +497,11 @@ impl<'a> Parser<'a> {
         let start = self.current_token_nc().start_position.clone();
         if self.expect(TokenKind::Return) { InvalidSyntaxExpected::new(start, self.current_token_nc().end_position.clone(), self.file_data, "return [expression]".to_string()).run() }
         self.advance();
-        let expr = self.expr();
+        let expr = if self.current_token_nc().kind == TokenKind::NewLine || self.current_token_nc().kind == TokenKind::EndOfFile {
+            Instruction::new(self.current_token_nc().start_position.clone(), self.current_token_nc().end_position.clone(), InstructionKind::Lit(Literal::Null))
+        } else {
+            self.expr()
+        };
         Instruction { 
             start_position: start, 
             end_position: self.current_token_nc().start_position.clone(), 

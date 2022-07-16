@@ -1,8 +1,9 @@
-var_assign : LET IDENTIFIER EQUALS expr
+var-assign : LET IDENTIFIER EQUALS expr
 
-var_update : IDENTIFIER EQUALS expr
+var-update : IDENTIFIER EQUALS expr
 
 expr       : comp-expr ((AND | OR) comp-expr)*
+           | AS (CONVOP:INT | CONVOP:FLOAT | CONVOP:STRING | CONVOP:BOOL)
 
 comp-expr  : NOT comp-expr
            | arith-expr (== | != | >= | <= | < | >) arith-expr
@@ -17,17 +18,27 @@ factor     : INT|FLOAT
 power      : atom (POW factor)*
 
 atom       : INT|FLOAT|IDENTIFIER
-           | LPAREN expr RPAREN
            | NULL
+           | IDENTIFIER 
+           | - > call-fn
+           | - > var-update
+           | return
+           | var-assign
+           | if-stat
+           | while
+           | use
+           | LPAREN expr RPAREN
 
-if_stat    : IF expr { ... }
+if-stat    : IF expr { ... }
            | ELSE IF expr { ... }
            | ELSE { ... }
 
 while      : WHILE expr { ... }
 
-create_fn  : FN IDENTIFIER(expr*)
+create-fn  : FN IDENTIFIER(expr*)
 
-call_fn    : IDENTIFIER(expr*)
+call-fn    : IDENTIFIER(expr*)
 
 use        : USE <IDENTIFIER>
+
+return     : RETURN expr*

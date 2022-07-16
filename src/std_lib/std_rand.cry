@@ -1,0 +1,11 @@
+fn randint() {
+    return systemRandInteger()
+}
+
+fn randfloat() {
+    return systemRandFloat()
+}
+
+fn randrange(min, max) {
+    return (randfloat() * (max - min) + min) as integer
+}

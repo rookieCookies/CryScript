@@ -1,0 +1,11 @@
+fn print(arg) {
+    systemOut(arg)
+}
+
+fn println(arg) {
+    systemOut(arg, "\n")
+}
+
+fn read() {
+    return systemIn()
+}

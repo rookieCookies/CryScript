@@ -11,15 +11,15 @@ impl BinaryOperator {
             BinaryOperator::Multiply => self.multiply(value1, value2, (&start, &end, file_data)),
             BinaryOperator::Divide => self.divide(value1, value2, (&start, &end, file_data)),
             BinaryOperator::Power => self.power(value1, value2, (&start, &end, file_data)),
-            BinaryOperator::EqualsTo => todo!(),
-            BinaryOperator::NotEqualsTo => todo!(),
-            BinaryOperator::GreaterThan => todo!(),
-            BinaryOperator::LesserThan => todo!(),
-            BinaryOperator::GreaterEquals => todo!(),
-            BinaryOperator::LesserEquals => todo!(),
-            BinaryOperator::And => todo!(),
-            BinaryOperator::Or => todo!(),
-            BinaryOperator::Nothing => value2,
+            _ => match (&value1, &value2) {
+                (Literal::Integer(n1), Literal::Integer(n2)) => Literal::Integer(self.compute_binary_operation(n1, n2)),
+                (Literal::Integer(n1), Literal::Float(n2)) => Literal::Float(self.compute_binary_operation(&(*n1 as f32), n2)),
+                (Literal::Float(n1), Literal::Integer(n2)) => Literal::Float(self.compute_binary_operation(n1, &(*n2 as f32))),
+                (Literal::Float(n1), Literal::Float(n2)) => Literal::Float(self.compute_binary_operation(n1, n2)),
+                (Literal::String(n1), Literal::String(n2)) => Literal::Bool(n1 == n2),
+                _ => InvalidBinaryOperationNumbers::new(start.clone(), end.clone(), file_data, value1, value2).run()
+            },
+            
         }
     }
 
@@ -49,20 +49,20 @@ impl BinaryOperator {
 
     pub fn from_token_kind(token_kind: TokenKind, (start, end): (Position, Position), file_data: &FileData) -> Self {
         match token_kind {
-            TokenKind::Equals => BinaryOperator::Nothing,
-            TokenKind::Plus | TokenKind::PlusEquals => BinaryOperator::Add,
-            TokenKind::Minus  | TokenKind::MinusEquals => BinaryOperator::Subtract,
+            TokenKind::Equals                                => BinaryOperator::Nothing,
+            TokenKind::Plus      | TokenKind::PlusEquals     => BinaryOperator::Add,
+            TokenKind::Minus     | TokenKind::MinusEquals    => BinaryOperator::Subtract,
             TokenKind::Multiply  | TokenKind::MultiplyEquals => BinaryOperator::Multiply,
-            TokenKind::Slash  | TokenKind::DivideEquals => BinaryOperator::Divide,
-            TokenKind::Power  | TokenKind::PowerEquals => BinaryOperator::Power,
-            TokenKind::EqualsTo => BinaryOperator::EqualsTo,
-            TokenKind::NotEquals => BinaryOperator::NotEqualsTo,
-            TokenKind::RightAngle => BinaryOperator::GreaterThan,
-            TokenKind::LeftAngle => BinaryOperator::LesserThan,
-            TokenKind::GreaterEquals => BinaryOperator::GreaterEquals,
-            TokenKind::SmallerEquals => BinaryOperator::LesserEquals,
-            TokenKind::And => BinaryOperator::And,
-            TokenKind::Or => BinaryOperator::Or,
+            TokenKind::Slash     | TokenKind::DivideEquals   => BinaryOperator::Divide,
+            TokenKind::Power     | TokenKind::PowerEquals    => BinaryOperator::Power,
+            TokenKind::EqualsTo                              => BinaryOperator::EqualsTo,
+            TokenKind::NotEquals                             => BinaryOperator::NotEqualsTo,
+            TokenKind::RightAngle                            => BinaryOperator::GreaterThan,
+            TokenKind::LeftAngle                             => BinaryOperator::LesserThan,
+            TokenKind::GreaterEquals                         => BinaryOperator::GreaterEquals,
+            TokenKind::SmallerEquals                         => BinaryOperator::LesserEquals,
+            TokenKind::And                                   => BinaryOperator::And,
+            TokenKind::Or                                    => BinaryOperator::Or,
             _ => TokenBinaryOperationConversion::new(&Token::new(start, end, token_kind), file_data).run()
         }
     }
@@ -86,11 +86,7 @@ impl BinaryOperator {
         }.to_string()
     }
 
-
-
-
     fn add(&self, n1: Literal, n2: Literal, (start, end, file_data): (&Position, &Position, &FileData)) -> Literal {
-        println!("add");
         match (&n1, &n2) {
             (Literal::Integer(n1), Literal::Integer(n2)) => Literal::Integer(n1.add(n2)),
             (Literal::Integer(n1), Literal::Float(n2)) => Literal::Float((*n1 as f32).add(n2)),

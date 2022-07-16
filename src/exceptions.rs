@@ -48,7 +48,7 @@ impl Exception for BasicException {
     fn run(&self) -> !{
         println!("{}", self.0);
         if env::var(ENV_DEV_DEBUG_EXCEPTION).unwrap() == "true" {
-            env::set_var("RUST_BACKTRACE", "full");
+            env::set_var("RUST_BACKTRACE", "1");
             panic!("dev debug")
         }
         crash!()
@@ -89,7 +89,7 @@ impl Exception for PositionException<'_> {
             " -->".color(self.colour_scheme.arrow_to_message),
             self.file_data.file_name,
             self.start_position.line + 1,
-            self.start_position.column,
+            self.start_position.column + 1,
         ).as_str());
 
         // buffer
@@ -103,8 +103,6 @@ impl Exception for PositionException<'_> {
                 (line_number + 1).to_string().color(self.colour_scheme.line_number),
                 "|".color(self.colour_scheme.separator)
             );
-            // " 99 |"
-            // "100 |"
 
             message.push_str(format!("{} {}\n", line_number_display, current_line).as_str());
 

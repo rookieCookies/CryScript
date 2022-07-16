@@ -244,7 +244,7 @@ impl<'a> Lexer<'a> {
     fn generate_keyword(&mut self) -> TokenKind {
         let mut string = String::new();
         while let Some(chr) = self.current_char() {
-            if !chr.is_ascii_alphabetic() {
+            if !chr.is_ascii_alphabetic() && chr != &'_' {
                 break;
             }
             string.push(*chr);
@@ -254,13 +254,14 @@ impl<'a> Lexer<'a> {
         match string.as_str() {
             "let" => TokenKind::Let,
             "fn" => TokenKind::Function,
-            "struct" => TokenKind::Struct,
+            "class" => TokenKind::Class,
             "if" => TokenKind::If,
             "else" => TokenKind::Else,
             "use" => TokenKind::Use,
             "return" => TokenKind::Return,
-            "true" => TokenKind::Integer(1),
-            "false" => TokenKind::Integer(0),
+            "as" => TokenKind::As,
+            "true" => TokenKind::Bool(true),
+            "false" => TokenKind::Bool(false),
             "null" => TokenKind::Null,
             "while" => TokenKind::While,
             _ => TokenKind::Identifier(string)

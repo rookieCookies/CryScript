@@ -11,7 +11,7 @@ impl InvalidBinaryOperationNumbers {
             end_position, 
             file_data, 
             "invalid binary operation", 
-            format!("expected a number type, found {}", number2.kind()), 
+            format!("expected a number type, found {} and {}", number1.kind(), number2.kind()), 
             EXCEPTION
         )
     }

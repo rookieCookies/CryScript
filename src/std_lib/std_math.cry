@@ -1,0 +1,17 @@
+fn min(value, min) {
+    return if value > min { return min } else { return value }
+}
+
+fn max(value, max) {
+    return if value < max { return max } else { return value }
+}
+
+fn clamp(value, min, max) {
+    return max(min(value, min), max)
+}
+
+fn abs(value) {
+    return if value < 0 {
+        return value *= -1
+    } else { return value }
+}
