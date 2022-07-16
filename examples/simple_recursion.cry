@@ -1,24 +1,8 @@
-/*
-    [!] The following piece of code will cause a stack overflow [!]
-
-    fn recursion(value, depth) {
-        if depth <= 0 {
-            return value
-            // This return statement only returns from the if statement thus still continuing
-        }
-        return recursion(value + 1, depth - 1)
-    }
-*/
-
-/*
-    This code won't crash since we're returning the value of the if statement
-*/
 fn recursion(value, depth) {
-    return if depth <= 0 {
-        return value 
-    } else { 
-        return recursion(value + 1, depth - 1) 
+    if depth <= 0 {
+        return value
     }
+    recursion(value + 3, depth - 1)
 }
 
 println(recursion(0, 10))
