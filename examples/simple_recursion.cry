@@ -1,8 +1,0 @@
-fn recursion(value, depth) {
-    if depth <= 0 {
-        return value
-    }
-    recursion(value + 3, depth - 1)
-}
-
-println(recursion(0, 10))
