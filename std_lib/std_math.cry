@@ -1,0 +1,92 @@
+var Math = new Math()
+class Math {
+    fn min(value, minimum_value) {
+        if value > minimum_value {
+            return minimum_value
+        }
+        value
+    }
+
+    fn max(value, maximum_value) {
+        if value < maximum_value {
+            return maximum_value
+        }
+        value
+    }
+
+    fn clamp(value, minimum_value, maximum_value) {
+        max(min(value, minimum_value), maximum_value)
+    }
+
+    fn percent(value, maximum_value) {
+        value / maximum_value
+    }
+
+    fn abs(value) {
+        if value < 0 {
+            return -value
+        }
+        value
+    }
+
+    fn sqrt(n: float) {
+        std_sqrt(n)
+    }
+}
+
+class Vector2 {
+    var x : float = 0.0
+    var y : float = 0.0
+
+    fn constructor(l_x: float, l_y: float) {
+        x = l_x
+        y = l_y
+    }
+
+    fn add(other_vector: Vector2) {
+        x += other_vector.x
+        y += other_vector.y
+    }
+
+    fn subtract(other_vector: Vector2) {
+        x -= other_vector.x
+        y -= other_vector.y
+    }
+
+    fn multiply(other_vector: Vector2) {
+        x *= other_vector.x
+        y *= other_vector.y
+    }
+
+    fn divide(other_vector: Vector2) {
+        x /= other_vector.x
+        y /= other_vector.y
+    }
+
+    fn pow(other_vector: Vector2) {
+        x ^= other_vector.x
+        y ^= other_vector.y
+    }
+
+    fn equals(other_vector: Vector2) {
+        (x as int) == (other_vector.x as int) && (x as int) == (other_vector.x as int)
+    }
+
+    fn length() {
+        Math.sqrt(x ^ 2 + y ^ 2)
+    }
+
+    fn length_squared() {
+        length() ^ 2
+    }
+
+    fn distance(other_vector: Vector2) {
+        var xd = other_vector.x - x
+        var yd = other_vector.y - y
+        Math.sqrt(xd ^ 2 + y ^ 2)
+    }
+
+    fn distance(other_vector: Vector2) {
+        distance(other_vector) ^ 2
+    }
+}

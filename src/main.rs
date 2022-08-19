@@ -1,59 +1,56 @@
-#![allow(unused)]
-use std::{env, cell::{RefMut, RefCell}, rc::Rc};
-
-use colored::Colorize;
-use environment::{register_environment_variables, ENV_FILE_NAME, ENV_NO_STD};
-use lexer::Lexer;
-use parser::instructions::{Instruction, InstructionKind, self, Literal};
-use rand::Rng;
-use utils::{read_file, FileData};
-
-use crate::{lexer::tokens::TokenKind, environment::{ENV_DEV_DEBUG_LEXER, ENV_DEV_DEBUG_PARSER}, parser::{Parser, context::Context}, std_lib::*};
-
-mod environment;
-mod utils;
-mod lexer;
-mod tests;
-mod exceptions;
-mod parser;
-mod std_lib;
+use cry_script::run;
 
 fn main() {
-    register_environment_variables();
-    run_app()
-}
+    let file_path = String::from("script.cry");
+    // print!("File path: ");
+    // stdout().flush().unwrap();
+    // stdin().read_line(&mut file_path).unwrap();
+    // if let Some('\n') = file_path.chars().next_back() {
+    //     file_path.pop();
+    // }
+    // if let Some('\r') = file_path.chars().next_back() {
+    //     file_path.pop();
+    // }
+    // let mut sample_size = String::new();
+    // print!("Sample size: ");
+    // stdout().flush().unwrap();
+    // stdin().read_line(&mut sample_size).unwrap();
+    // if let Some('\n') = sample_size.chars().next_back() {
+    //     sample_size.pop();
+    // }
+    // if let Some('\r') = sample_size.chars().next_back() {
+    //     sample_size.pop();
+    // }
+    // let mut system = System::new_all();
+    // let sample_size = 1; //sample_size.parse().unwrap();
 
-fn run_app() {
-    let root_context = Context::new(None, true);
-    let cell = RefCell::new(root_context);
-    let rc = Rc::new(cell);
-    if env::var(ENV_NO_STD).unwrap() == "false" {
-        Context::import_string(rc.clone(), &STD_MAIN.to_string(), &"std".to_string());
-    }
-    println!("{} {}", "Running".bright_green(), env::var(ENV_FILE_NAME).unwrap().clone().bright_green().bold());
-    Context::import_file(rc.clone(), &env::var(ENV_FILE_NAME).unwrap());
-}
+    // let mut average_time = 0;
+    // let mut highest_value = 0;
+    // let mut lowest_value = u128::MAX;
 
-pub fn run(instructions: &Vec<Instruction>, file_data: &FileData, context: Rc<RefCell<Context>>) -> Literal {
-    for instruction in instructions {
-        if matches!(instruction.kind, InstructionKind::Use { .. }) {
-            instruction.visit(file_data, context.clone());
-        }
-    }
-    for instruction in instructions {
-        if matches!(instruction.kind, InstructionKind::DeclareFunction { .. }) {
-            instruction.visit(file_data, context.clone());
-        }
-    }
-    let mut last_statement = Literal::Null;
-    for instruction in instructions {
-        if !matches!(instruction.kind, InstructionKind::DeclareFunction { .. } | InstructionKind::Use { .. }) {
-            let v = instruction.visit(file_data, context.clone());
-            match &v {
-                Literal::Return(l) => return *l.clone(),
-                _ => last_statement = v,
-            }
-        }
-    }
-    last_statement
+    // for _ in 0..sample_size {
+    //     let time = run(file_path.as_str());
+    //     average_time += time / sample_size;
+    //     if time > highest_value {
+    //         highest_value = time;
+    //         // println!("new highest {}", highest_value)
+    //     }
+    //     if time < lowest_value {
+    //         lowest_value = time;
+    //         // println!("new lowest {}", lowest_value)
+    //     }
+    //     // system.refresh_all();
+    //     // println!("mem usage: {}", system.process(sysinfo::get_current_pid().unwrap()).unwrap().memory());
+    //     // println!("virtual mem usage: {}\n\n", system.process(sysinfo::get_current_pid().unwrap()).unwrap().virtual_memory())
+    // }
+    // println!(
+    //     "Average time was {} in {} samples",
+    //     average_time, sample_size
+    // );
+    // println!("Highest time was {}", highest_value);
+    // println!("Lowest time was {}", lowest_value);
+    println!(
+        "\nExecuted in {}ms",
+        run(file_path.as_str()) as f64 / 1_000_000_f64,
+    )
 }

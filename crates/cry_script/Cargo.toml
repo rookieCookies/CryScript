@@ -1,0 +1,16 @@
+[package]
+name = "cry_script"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+utils = { path = "../utils" }
+colored = "2.0.0"
+rand = "0.8.5"
+include_dir = "0.7.2"
+
+[lib]
+name = "cry_script"
+path = "src/lib.rs"

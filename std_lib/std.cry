@@ -1,0 +1,23 @@
+// Prints out a message
+fn print(message) {
+    std_out(message)
+}
+
+// Prints out a message with a new line following
+fn println(message) {
+    print(message)
+    print("\n")
+}
+
+fn read() {
+    std_in()
+}
+
+// Clones a variable
+fn clone(value) {
+    std_clone(value)
+}
+
+fn exit(id: int = 0) {
+    std_exit(id)
+}

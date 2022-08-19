@@ -1,0 +1,22 @@
+var Random = new Random()
+class Random {
+    fn rand() {
+        rand_int()
+    }
+
+    fn rand_int() {
+        std_rand_int()
+    }
+
+    fn rand_float() {
+        std_rand_float()
+    }
+
+    fn rand_range(min, max) {
+        rand_float() * (max - min) + min
+    }
+
+    fn rand_range_int(min, max) {
+        (rand_float() * (max - min) + min) as int
+    }
+}
