@@ -1,3 +1,4 @@
+#![allow(clippy::cast_ref_to_mut)]
 use std::{cell::RefCell, fmt::Display, rc::Rc};
 
 use crate::{
@@ -198,7 +199,9 @@ impl Data {
 
     pub fn original_mut(&mut self) -> &mut Data {
         match &self.data_type {
-            DataType::Reference(v) => unsafe{&mut *((*v).data.original() as *const Data as *mut Data)},
+            DataType::Reference(v) => unsafe {
+                &mut *((*v).data.original() as *const Data as *mut Data)
+            },
             _ => self,
         }
     }
@@ -222,7 +225,7 @@ impl Data {
             self.file_data.clone(),
             self.start.clone(),
             other.end.clone(),
-            DataType::Integer(if data_eq(&self, &other)? { 1 } else { 0 }),
+            DataType::Integer(if data_eq(self, other)? { 1 } else { 0 }),
         ))
     }
 
@@ -232,7 +235,7 @@ impl Data {
             self.file_data.clone(),
             self.start.clone(),
             other.end.clone(),
-            DataType::Integer(if !data_eq(&self, &other)? { 1 } else { 0 }),
+            DataType::Integer(if !data_eq(self, other)? { 1 } else { 0 }),
         ))
     }
 
@@ -242,7 +245,7 @@ impl Data {
             self.file_data.clone(),
             self.start.clone(),
             other.end.clone(),
-            DataType::Integer(if data_gt(&self, other)? { 1 } else { 0 }),
+            DataType::Integer(if data_gt(self, other)? { 1 } else { 0 }),
         ))
     }
 
@@ -252,7 +255,7 @@ impl Data {
             self.file_data.clone(),
             self.start.clone(),
             other.end.clone(),
-            DataType::Integer(if data_gt(&self, &other)? || data_eq(&self, &other)? {
+            DataType::Integer(if data_gt(self, other)? || data_eq(self, other)? {
                 1
             } else {
                 0
@@ -266,7 +269,7 @@ impl Data {
             self.file_data.clone(),
             self.start.clone(),
             other.end.clone(),
-            DataType::Integer(if !data_gt(&self, &other)? && !data_eq(&self, &other)? {
+            DataType::Integer(if !data_gt(self, other)? && !data_eq(self, other)? {
                 1
             } else {
                 0
@@ -280,7 +283,7 @@ impl Data {
             self.file_data.clone(),
             self.start.clone(),
             other.end.clone(),
-            DataType::Integer(if !data_gt(&self, other)? { 1 } else { 0 }),
+            DataType::Integer(if !data_gt(self, other)? { 1 } else { 0 }),
         ))
     }
 
@@ -304,7 +307,7 @@ impl Data {
                 (DataType::Float(n1), DataType::Integer(n2)) => DataType::Float(n1 + *n2 as f32),
                 (DataType::Float(n1), DataType::Float(n2)) => DataType::Float(n1 + n2),
                 (DataType::String(_), _) | (_, DataType::String(_)) => DataType::String({
-                    let mut str : String = data1.data_type.to_string();
+                    let mut str: String = data1.data_type.to_string();
                     str += data2.data_type.to_string().as_str();
                     str
                 }),
@@ -498,7 +501,9 @@ impl Data {
                     Ok(v) => v,
                     Err(_) => return convert_exception(self, convert_type),
                 }),
-                (TypeHint::Integer, DataType::Null) => return convert_exception(self, convert_type),
+                (TypeHint::Integer, DataType::Null) => {
+                    return convert_exception(self, convert_type)
+                }
                 (TypeHint::String, DataType::Integer(i)) => DataType::String(i.to_string()),
                 (TypeHint::String, DataType::Float(i)) => DataType::String(i.to_string()),
                 (TypeHint::String, DataType::String(_)) => self.data_type.clone(),
@@ -527,29 +532,27 @@ fn convert_exception(data: &Data, convert_type: &Type) -> Result<Data, Exception
 }
 
 fn data_eq(n1: &Data, n2: &Data) -> Result<bool, Exception> {
-    Ok(
-        match (n1.data_type.original(), &n2.data_type.original()) {
-            (DataType::Integer(v1), DataType::Integer(v2)) => &v1 == v2,
-            (DataType::Integer(v1), DataType::Float(v2)) => v1 as f32 == *v2,
-            (DataType::Integer(v1), DataType::String(v2)) => &v1.to_string() == v2,
-            (DataType::Float(v1), DataType::Integer(v2)) => v1 == (*v2) as f32,
-            (DataType::Float(v1), DataType::Float(v2)) => &v1 == v2,
-            (DataType::Float(v1), DataType::String(v2)) => &v1.to_string() == v2,
-            (DataType::String(v1), DataType::Integer(v2)) => &v1 == &v2.to_string(),
-            (DataType::String(v1), DataType::Float(v2)) => &v1 == &v2.to_string(),
-            (DataType::String(v1), DataType::String(v2)) => &v1 == v2,
-            (DataType::Null, DataType::Null) => true,
-            (DataType::Class(_), DataType::Null) | (DataType::Null, DataType::Class(_)) => false,
-            (DataType::Class(mut v), _) => Context::call_override_class_fn(
-                &mut v.context,
-                &"equals".to_string(),
-                vec![n2.clone()],
-                (&n1.start, &n2.end, &n1.file_data),
-            )?
-            .as_bool()?,
-            _ => false,
-        },
-    )
+    Ok(match (n1.data_type.original(), &n2.data_type.original()) {
+        (DataType::Integer(v1), DataType::Integer(v2)) => &v1 == v2,
+        (DataType::Integer(v1), DataType::Float(v2)) => v1 as f32 == *v2,
+        (DataType::Integer(v1), DataType::String(v2)) => &v1.to_string() == v2,
+        (DataType::Float(v1), DataType::Integer(v2)) => v1 == (*v2) as f32,
+        (DataType::Float(v1), DataType::Float(v2)) => &v1 == v2,
+        (DataType::Float(v1), DataType::String(v2)) => &v1.to_string() == v2,
+        (DataType::String(v1), DataType::Integer(v2)) => v1 == v2.to_string(),
+        (DataType::String(v1), DataType::Float(v2)) => v1 == v2.to_string(),
+        (DataType::String(v1), DataType::String(v2)) => &v1 == v2,
+        (DataType::Null, DataType::Null) => true,
+        (DataType::Class(_), DataType::Null) | (DataType::Null, DataType::Class(_)) => false,
+        (DataType::Class(mut v), _) => Context::call_override_class_fn(
+            &mut v.context,
+            &"equals".to_string(),
+            vec![n2.clone()],
+            (&n1.start, &n2.end, &n1.file_data),
+        )?
+        .as_bool()?,
+        _ => false,
+    })
 }
 
 fn data_gt(n1: &Data, n2: &Data) -> Result<bool, Exception> {

@@ -1,4 +1,4 @@
-use std::{rc::Rc};
+use std::rc::Rc;
 
 use crate::{
     exceptions::{
@@ -91,10 +91,7 @@ impl Function {
             if args.len() <= i {
                 continue;
             }
-            match (
-                &arg.type_hint.type_value,
-                &args[i].original().data_type,
-            ) {
+            match (&arg.type_hint.type_value, &args[i].original().data_type) {
                 (TypeHint::Integer, crate::parser::data::DataType::Integer(_))
                 | (TypeHint::String, crate::parser::data::DataType::String(_))
                 | (TypeHint::Float, crate::parser::data::DataType::Float(_))
@@ -128,11 +125,7 @@ impl Function {
                 args[i].to_owned(),
                 arg.type_hint.clone(),
                 true,
-                (
-                    &args[i].start,
-                    &args[i].end,
-                    &args[i].file_data,
-                ),
+                (&args[i].start, &args[i].end, &args[i].file_data),
             )?;
         }
         match self.body.visit(&mut func_context) {

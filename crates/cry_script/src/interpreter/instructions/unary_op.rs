@@ -40,7 +40,7 @@ impl UnaryOperator {
                 data.end.clone(),
                 (!data.as_bool()?).into(),
             ),
-            _ => panic!()
+            _ => panic!(),
         })
     }
 }

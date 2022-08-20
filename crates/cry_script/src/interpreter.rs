@@ -93,19 +93,29 @@ impl Class {
                 } => {
                     variables.push((
                         identifier.clone(),
-                        Variable::new(Data::new(
-                            body.file_data.clone(),
-                            body.start.clone(),
-                            body.end.clone(),
-                            DataType::Function(Box::new(Function::new(
-                                &arguments,
-                                *body.clone(),
+                        Variable::new(
+                            Data::new(
+                                body.file_data.clone(),
                                 body.start.clone(),
                                 body.end.clone(),
-                                identifier.clone(),
-                                &mut context,
-                            ))),
-                        ), Type::new(TypeHint::None, body.start.clone(), body.end.clone(), body.file_data.clone()), true, identifier),
+                                DataType::Function(Box::new(Function::new(
+                                    &arguments,
+                                    *body.clone(),
+                                    body.start.clone(),
+                                    body.end.clone(),
+                                    identifier.clone(),
+                                    &mut context,
+                                ))),
+                            ),
+                            Type::new(
+                                TypeHint::None,
+                                body.start.clone(),
+                                body.end.clone(),
+                                body.file_data.clone(),
+                            ),
+                            true,
+                            identifier,
+                        ),
                     ));
                 }
                 _ => InvalidInstructionInClass::call(&i.start, &i.end, &i.file_data),
@@ -183,7 +193,13 @@ impl Display for ClassVariable {
         write!(
             f,
             "{} variables: {} classes: {}",
-            self.class_name, self.context.variables_defined_in_this_scope.iter().map(|x| format!("{} ", x.0)).collect::<String>(), self.context.classes
+            self.class_name,
+            self.context
+                .variables_defined_in_this_scope
+                .iter()
+                .map(|x| format!("{} ", x.0))
+                .collect::<String>(),
+            self.context.classes
         )
     }
 }

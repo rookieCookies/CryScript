@@ -15,7 +15,7 @@ use crate::{
     FileData, Position,
 };
 
-use super::{context::Context};
+use super::context::Context;
 
 pub struct BuiltInFunctions;
 impl BuiltInFunctions {
@@ -30,7 +30,7 @@ impl BuiltInFunctions {
                 file_data.clone(),
                 start.clone(),
                 end.clone(),
-                args[0].data_type.original().clone(),
+                args[0].data_type.original(),
             )),
             "std_out" => {
                 print!("{}", args[0].data_type);
@@ -74,9 +74,9 @@ impl BuiltInFunctions {
                     Ok(v) => v,
                     Err(_) => {
                         return Err(InvalidFilePath::call(
-                            &start,
-                            &end,
-                            &file_data,
+                            start,
+                            end,
+                            file_data,
                             &args[0].data_type.to_string(),
                         ))
                     }
@@ -86,9 +86,9 @@ impl BuiltInFunctions {
                     Ok(_) => {}
                     Err(_) => {
                         return Err(InvalidFilePath::call(
-                            &start,
-                            &end,
-                            &file_data,
+                            start,
+                            end,
+                            file_data,
                             &args[0].data_type.to_string(),
                         ))
                     }
@@ -108,9 +108,9 @@ impl BuiltInFunctions {
                     Ok(v) => v,
                     Err(_) => {
                         return Err(InvalidFilePath::call(
-                            &start,
-                            &end,
-                            &file_data,
+                            start,
+                            end,
+                            file_data,
                             &args[0].data_type.to_string(),
                         ))
                     }
@@ -130,9 +130,9 @@ impl BuiltInFunctions {
                     Ok(v) => v,
                     Err(_) => {
                         return Err(InvalidFilePath::call(
-                            &start,
-                            &end,
-                            &file_data,
+                            start,
+                            end,
+                            file_data,
                             &args[0].data_type.to_string(),
                         ))
                     }
@@ -152,9 +152,9 @@ impl BuiltInFunctions {
                     Ok(v) => v,
                     Err(_) => {
                         return Err(InvalidFilePath::call(
-                            &start,
-                            &end,
-                            &file_data,
+                            start,
+                            end,
+                            file_data,
                             &args[0].data_type.to_string(),
                         ))
                     }
@@ -177,13 +177,11 @@ impl BuiltInFunctions {
                 )),
                 _ => panic!(),
             },
-            "std_exit" => std::process::exit(
-                match args[0].original().data_type {
-                    DataType::Integer(v) => v,
-                    DataType::Float(v) => v as i32,
-                    _ => panic!(),
-                },
-            ),
+            "std_exit" => std::process::exit(match args[0].original().data_type {
+                DataType::Integer(v) => v,
+                DataType::Float(v) => v as i32,
+                _ => panic!(),
+            }),
             _ => Context::call_fn_no_std(context, identifier, args, (start, end, file_data)),
         }
     }

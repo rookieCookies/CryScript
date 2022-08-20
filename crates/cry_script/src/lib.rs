@@ -16,7 +16,7 @@ use interpreter::{
     instructions::{Instruction, InstructionType},
 };
 use parser::{data::Data, Parser};
-use variables::{Variables};
+use variables::Variables;
 
 use self::lexer::Lexer;
 
@@ -25,11 +25,11 @@ const STD_FILES: [&str; 3] = ["std_rand", "std_math", "std_file"];
 
 pub fn run(root_file_path: &str) -> u128 {
     let mut variables = Variables::new();
-    
+
     let mut file_data = String::new();
     match File::open(root_file_path) {
         Ok(v) => v,
-        Err(_) => Exception::new("Err: Unable to find startup fine".red().bold().to_string()).run()
+        Err(_) => Exception::new("Err: Unable to find startup fine".red().bold().to_string()).run(),
     }
     .read_to_string(&mut file_data)
     .unwrap();
@@ -39,7 +39,7 @@ pub fn run(root_file_path: &str) -> u128 {
             data: file_data,
             path: root_file_path.to_string(),
         }),
-        &mut variables
+        &mut variables,
     );
     match Context::import_data(
         &mut context,
@@ -64,7 +64,7 @@ pub fn run(root_file_path: &str) -> u128 {
     );
     let time = Instant::now();
     match run_from_file(root_file_path, &mut context) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(v) => v.run(),
     };
     time.elapsed().as_nanos()

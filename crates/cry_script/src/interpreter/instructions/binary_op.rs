@@ -45,12 +45,12 @@ impl BinaryOperator {
             BinaryOperator::Divide => Data::div(n1, n2, data1, data2),
             BinaryOperator::Power => Data::pow(n1, n2, data1, data2),
 
-            BinaryOperator::EqualsTo => Ok(data1.eq(&n2)?),
-            BinaryOperator::NotEquals => Ok(data1.ne(&n2)?),
-            BinaryOperator::GreaterEquals => Ok(data1.geq(&n2)?),
-            BinaryOperator::GreaterThan => Ok(data1.gt(&n2)?),
-            BinaryOperator::LesserEquals => Ok(data1.leq(&n2)?),
-            BinaryOperator::LesserThan => Ok(data1.lt(&n2)?),
+            BinaryOperator::EqualsTo => Ok(data1.eq(n2)?),
+            BinaryOperator::NotEquals => Ok(data1.ne(n2)?),
+            BinaryOperator::GreaterEquals => Ok(data1.geq(n2)?),
+            BinaryOperator::GreaterThan => Ok(data1.gt(n2)?),
+            BinaryOperator::LesserEquals => Ok(data1.leq(n2)?),
+            BinaryOperator::LesserThan => Ok(data1.lt(n2)?),
             BinaryOperator::And => Ok(Data::new(
                 data1.file_data.clone(),
                 data1.start.clone(),

@@ -12,7 +12,7 @@ use crate::{
     },
     parser::data::{Data, DataType},
     run_from_file, run_with_data,
-    variables::{Variables, VariableReference},
+    variables::{VariableReference, Variables},
     AsString, FileData, Position, Returnable, STD_DIR, STD_FILES,
 };
 
@@ -67,18 +67,21 @@ impl Context {
             self.file_data.clone(),
         );
         let identifier = function.identifier.clone();
-        match self.declare_variable(identifier.clone(), Variable::new(
-                    Data::new(
-                        self.file_data.clone(),
-                        function.start.clone(),
-                        function.end.clone(),
-                        DataType::Function(Box::new(function)),
-                    ),
-                    type_hint,
-                    true,
-                    identifier,
-                )) {
-            Ok(_) => {},
+        match self.declare_variable(
+            identifier.clone(),
+            Variable::new(
+                Data::new(
+                    self.file_data.clone(),
+                    function.start.clone(),
+                    function.end.clone(),
+                    DataType::Function(Box::new(function)),
+                ),
+                type_hint,
+                true,
+                identifier,
+            ),
+        ) {
+            Ok(_) => {}
             Err(v) => v.run(),
         };
     }
@@ -109,7 +112,7 @@ impl Context {
             .get(identifier)
         {
             Some(v) => {
-                let var_ref = unsafe { &mut *(&*context).variables }.access_variable(v.clone());
+                let var_ref = unsafe { &mut *(*context).variables }.access_variable(*v);
                 match &(*var_ref).data.data_type {
                     DataType::Function(v) => v,
                     _ => {
@@ -125,8 +128,15 @@ impl Context {
                 None => {
                     let mut current = context;
                     loop {
-                        println!("{}", unsafe{&*current}.variables_defined_in_this_scope.iter().map(|x| format!("{} ", x.0)).collect::<String>());
-                        current = match unsafe{&*current}.parent {
+                        println!(
+                            "{}",
+                            unsafe { &*current }
+                                .variables_defined_in_this_scope
+                                .iter()
+                                .map(|x| format!("{} ", x.0))
+                                .collect::<String>()
+                        );
+                        current = match unsafe { &*current }.parent {
                             Some(v) => v,
                             None => break,
                         };
@@ -134,7 +144,7 @@ impl Context {
                     Err(AccessUndeclaredFunction::call(
                         start, end, file_data, identifier,
                     ))
-                },
+                }
             },
         }
     }
@@ -145,7 +155,10 @@ impl Context {
         args: Vec<Data>,
         (start, end, file_data): (&Position, &Position, &Rc<FileData>),
     ) -> Result<Data, Exception> {
-        if unsafe { &*context }.variables_defined_in_this_scope.contains_key(identifier) {
+        if unsafe { &*context }
+            .variables_defined_in_this_scope
+            .contains_key(identifier)
+        {
             Context::call_fn_no_std(context, identifier, args, (start, end, file_data))
         } else {
             Err(AccessUndeclaredFunction::call(
@@ -159,10 +172,12 @@ impl Context {
         identifier: &String,
         (start, end, file_data): (&Position, &Position, &Rc<FileData>),
     ) -> Result<&Data, Exception> {
-        Ok(&unsafe{&*self
-            .access_variable(identifier, (start, end, file_data))?
-            .reference}.data
-        )
+        Ok(&unsafe {
+            &*self
+                .access_variable(identifier, (start, end, file_data))?
+                .reference
+        }
+        .data)
     }
 
     pub(crate) fn access_variable(
@@ -170,8 +185,11 @@ impl Context {
         identifier: &String,
         (start, end, file_data): (&Position, &Position, &Rc<FileData>),
     ) -> Result<VariableReference, Exception> {
-        match self.variables_defined_in_this_scope.get(&identifier.clone()) {
-            Some(v) => Ok(unsafe{&mut *self.variables}.access_variable(v.clone())),
+        match self
+            .variables_defined_in_this_scope
+            .get(&identifier.clone())
+        {
+            Some(v) => Ok(unsafe { &mut *self.variables }.access_variable(*v)),
             None => match &self.parent {
                 Some(v) => unsafe { &**v }.access_variable(identifier, (start, end, file_data)),
                 None => Err(AccessUndeclaredVariable::call(
@@ -232,17 +250,20 @@ impl Context {
                 if var.is_final {
                     return Err(VariableIsFinal::call(start, end, file_data, identifier));
                 }
-                var.data.original().data_type.is_of_type(&var.type_hint,
-                                identifier,
-                                (start, end, file_data),
-                            )?;
+                var.data.original().data_type.is_of_type(
+                    &var.type_hint,
+                    identifier,
+                    (start, end, file_data),
+                )?;
                 *var.data.original_mut() = data
-            },
+            }
             None => match ctx.parent {
                 Some(v) => Context::update_variable(v, identifier, data, (start, end, file_data))?,
-                None => return Err(UpdateUndeclaredVariable::call(
-                    start, end, file_data, identifier,
-                )),
+                None => {
+                    return Err(UpdateUndeclaredVariable::call(
+                        start, end, file_data, identifier,
+                    ))
+                }
             },
         }
         Ok(())
@@ -256,20 +277,18 @@ impl Context {
         is_final: bool,
         (start, end, file_data): (&Position, &Position, &Rc<FileData>),
     ) -> Result<(), Exception> {
-        data.original().data_type.is_of_type(
-            &type_hint,
-            &identifier,
-            (start, end, file_data),
-        )?;
-        match &type_hint.type_value {
-            TypeHint::Class(i) => {
-                if !self.has_class(i) {
-                    return Err(AccessUndeclaredClass::call(start, end, file_data, i));
-                }
+        data.original()
+            .data_type
+            .is_of_type(&type_hint, &identifier, (start, end, file_data))?;
+        if let TypeHint::Class(i) = &type_hint.type_value {
+            if !self.has_class(i) {
+                return Err(AccessUndeclaredClass::call(start, end, file_data, i));
             }
-            _ => {}
         }
-        self.declare_variable(identifier.clone(), Variable::new(data, type_hint, is_final, identifier))
+        self.declare_variable(
+            identifier.clone(),
+            Variable::new(data, type_hint, is_final, identifier),
+        )
     }
 
     pub(crate) fn declare_variable(
@@ -277,8 +296,18 @@ impl Context {
         identifier: String,
         variable: Variable,
     ) -> Result<(), Exception> {
-        self.variables_defined_in_this_scope.insert(identifier.clone(), unsafe{&mut *self.variables}.declare_variable(variable));
-        self.persistent_storage.push( unsafe{&mut *self.variables}.access_variable(self.variables_defined_in_this_scope.get(&identifier).unwrap().clone()));
+        self.variables_defined_in_this_scope.insert(
+            identifier.clone(),
+            unsafe { &mut *self.variables }.declare_variable(variable),
+        );
+        self.persistent_storage.push(
+            unsafe { &mut *self.variables }.access_variable(
+                *self
+                    .variables_defined_in_this_scope
+                    .get(&identifier)
+                    .unwrap(),
+            ),
+        );
         Ok(())
     }
 

@@ -1,15 +1,13 @@
+use colored::Colorize;
+use slotmap::{DefaultKey, SlotMap};
 use std::{
     env,
     fmt::Display,
-    ops::{Deref, DerefMut}, mem::size_of,
+    mem::size_of,
+    ops::{Deref, DerefMut},
 };
-use colored::Colorize;
-use slotmap::{DefaultKey, SlotMap};
 
-use crate::{
-    interpreter::{type_hint::Type},
-    parser::data::Data, exceptions::Exception,
-};
+use crate::{exceptions::Exception, interpreter::type_hint::Type, parser::data::Data};
 
 const SIZE_OF_DATA: usize = size_of::<Data>();
 pub struct Variables {
@@ -20,7 +18,9 @@ pub struct Variables {
 
 impl Variables {
     pub(crate) fn new() -> Self {
-        let size = string_to_bytes(env::var("CRYSCRIPT_VAR_MEMORY").unwrap_or("MB1024".to_string()));
+        let size = string_to_bytes(
+            env::var("CRYSCRIPT_VAR_MEMORY").unwrap_or_else(|_| "MB1024".to_string()),
+        );
         Self {
             map: SlotMap::with_capacity(size / SIZE_OF_DATA + 1),
             size,
@@ -40,7 +40,7 @@ impl Variables {
         }
         self.map.insert(var)
     }
-    
+
     pub(crate) fn update_variable(&mut self, key: DefaultKey, data: Data) {
         self.map.get_mut(key).unwrap().data = data
     }
@@ -61,11 +61,16 @@ impl Variables {
             self.remove_variable(i)
         }
         if self.used > self.size {
-            Exception::new("Err: Memory overflow, consider increasing maximum memory of the program".red().bold().to_string()).run()
+            Exception::new(
+                "Err: Memory overflow, consider increasing maximum memory of the program"
+                    .red()
+                    .bold()
+                    .to_string(),
+            )
+            .run()
         }
     }
-} 
-
+}
 
 #[derive(Debug)]
 pub(crate) struct VariableReference {
@@ -144,14 +149,15 @@ fn string_to_bytes(string: String) -> usize {
     let split = string.split_at(2);
     let prefix = split.0;
     let number = split.1.parse::<usize>().unwrap();
-    number * match prefix {
-        "BT" => 1,
-        "KB" => 1_000,
-        "MB" => 1_000_000,
-        "GB" => 1_000_000_000,
-        "TB" => 1_000_000_000_000,
-        "PB" => 1_000_000_000_000_000,
-        "EB" => 1_000_000_000_000_000_000,
-        _ => panic!("invalid memory type")
-    }
+    number
+        * match prefix {
+            "BT" => 1,
+            "KB" => 1_000,
+            "MB" => 1_000_000,
+            "GB" => 1_000_000_000,
+            "TB" => 1_000_000_000_000,
+            "PB" => 1_000_000_000_000_000,
+            "EB" => 1_000_000_000_000_000_000,
+            _ => panic!("invalid memory type"),
+        }
 }
