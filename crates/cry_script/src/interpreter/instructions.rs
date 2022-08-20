@@ -1,13 +1,11 @@
 use std::{fmt::Display, path::Path, rc::Rc};
 
-use utils::wrap;
-
 use crate::{
     exceptions::{
         interpreter_exceptions::{CantRunInContext, InvalidFilePath, ReturnFromRoot},
         Exception,
     },
-    parser::data::{original_data, Data, DataType},
+    parser::data::{Data, DataType},
     run_with_instructions, FileData, Position, Returnable,
 };
 pub mod binary_op;
@@ -15,11 +13,7 @@ pub mod unary_op;
 
 use self::{binary_op::BinaryOperator, unary_op::UnaryOperator};
 
-use super::{
-    context::Context,
-    function::{Function, Type},
-    Class,
-};
+use super::{context::Context, function::Function, type_hint::Type, Class};
 
 #[macro_export]
 macro_rules! returnable {
@@ -140,82 +134,79 @@ impl Instruction {
     pub(crate) fn visit(&self, context_ptr: *mut Context) -> Result<Returnable, Exception> {
         let context_ref = unsafe { &mut *context_ptr };
         match &self.instruction_type {
-            InstructionType::Data(data) => Ok(Returnable::Evaluate(wrap(data.clone()))),
+            InstructionType::Data(data) => Ok(Returnable::Evaluate(data.clone())),
             InstructionType::BinaryOperation {
                 left,
                 right,
                 operator,
             } => {
-                let left = returnable!(left.visit(context_ptr)?);
-                let right = returnable!(right.visit(context_ptr)?);
+                let mut base_left = returnable!(left.visit(context_ptr)?);
+                let base_right = returnable!(right.visit(context_ptr)?);
 
-                let data1_ref = original_data(&left);
-                let data2_ref = original_data(&right);
+                let original_left = base_left.original();
+                let original_right = base_right.original();
 
                 Ok(Returnable::Evaluate(match operator {
                     BinaryOperator::AddAssign => {
                         let data = Data::add(
-                            left.clone(),
-                            right,
-                            &*data1_ref.borrow(),
-                            &*data2_ref.borrow(),
+                            &base_left,
+                            &base_right,
+                            original_left,
+                            original_right,
                         )?;
-                        *data1_ref.borrow_mut() = data;
-                        left
+                        base_left.original_mut().data_type = data.data_type;
+                        base_left
                     }
                     BinaryOperator::RemoveAssign => {
                         let data = Data::sub(
-                            left.clone(),
-                            right,
-                            &*data1_ref.borrow(),
-                            &*data2_ref.borrow(),
+                            &base_left,
+                            &base_right,
+                            original_left,
+                            original_right,
                         )?;
-                        *data1_ref.borrow_mut() = data;
-                        left
-                    }
-                    BinaryOperator::DivideAssign => {
-                        let data = Data::div(
-                            left.clone(),
-                            right,
-                            &*data1_ref.borrow(),
-                            &*data2_ref.borrow(),
-                        )?;
-                        *data1_ref.borrow_mut() = data;
-                        left
+                        base_left.original_mut().data_type = data.data_type;
+                        base_left
                     }
                     BinaryOperator::MultiplyAssign => {
                         let data = Data::mul(
-                            left.clone(),
-                            right,
-                            &*data1_ref.borrow(),
-                            &*data2_ref.borrow(),
+                            &base_left,
+                            &base_right,
+                            original_left,
+                            original_right,
                         )?;
-                        *data1_ref.borrow_mut() = data;
-                        left
+                        base_left.original_mut().data_type = data.data_type;
+                        base_left
+                    }
+                    BinaryOperator::DivideAssign => {
+                        let data = Data::div(
+                            &base_left,
+                            &base_right,
+                            original_left,
+                            original_right,
+                        )?;
+                        base_left.original_mut().data_type = data.data_type;
+                        base_left
                     }
                     BinaryOperator::PowerAssign => {
                         let data = Data::pow(
-                            left.clone(),
-                            right,
-                            &*data1_ref.borrow(),
-                            &*data2_ref.borrow(),
+                            &base_left,
+                            &base_right,
+                            original_left,
+                            original_right,
                         )?;
-                        *data1_ref.borrow_mut() = data;
-                        left
+                        base_left.original_mut().data_type = data.data_type;
+                        base_left
                     }
-                    _ => wrap(operator.operate(
-                        left,
-                        right,
-                        &*data1_ref.borrow(),
-                        &*data2_ref.borrow(),
-                    )?),
+                    _ => {
+                        operator.operate(&base_left, &base_right, original_left, original_right)?
+                    }
                 }))
             }
             InstructionType::UnaryOperation { value, operator } => {
-                Ok(Returnable::Evaluate(wrap({
+                Ok(Returnable::Evaluate({
                     let data_ref = returnable!(value.visit(context_ptr)?);
-                    operator.operate(data_ref.clone(), &*original_data(&data_ref).borrow())?
-                })))
+                    operator.operate(&data_ref, &*&data_ref.original())?
+                }))
             }
             InstructionType::UseStatement { file_path } => {
                 if !file_path.starts_with("std_") && !Path::new(file_path).exists() {
@@ -232,16 +223,16 @@ impl Instruction {
                     self.file_data.clone()
                 )?)))
             }
-            InstructionType::VarAccess { identifier } => Ok(Returnable::Evaluate({
+            InstructionType::VarAccess { identifier } => {
                 let original = context_ref
-                    .access_data(identifier, (&self.start, &self.end, &self.file_data))?;
-                wrap(Data::new(
+                    .access_variable(identifier, (&self.start, &self.end, &self.file_data))?;
+                Ok(Returnable::Evaluate(Data::new(
                     self.file_data.clone(),
                     self.start.clone(),
                     self.end.clone(),
                     DataType::Reference(original),
-                ))
-            })),
+                )))
+            },
             InstructionType::VarAssign {
                 identifier,
                 data,
@@ -256,12 +247,7 @@ impl Instruction {
                     *is_final,
                     (&self.start, &self.end, &self.file_data),
                 )?;
-                Ok(Returnable::Evaluate(wrap(Data::new(
-                    self.file_data.clone(),
-                    self.start.clone(),
-                    self.end.clone(),
-                    DataType::Null,
-                ))))
+                Ok(Returnable::Evaluate(Data::null(self.file_data.clone(), self.start.clone(), self.end.clone())))
             }
             InstructionType::VarUpdate { identifier, data } => {
                 let data = returnable!(data.visit(context_ptr)?); // To prevent runtime borrow errors
@@ -271,12 +257,7 @@ impl Instruction {
                     data,
                     (&self.start, &self.end, &self.file_data),
                 )?;
-                Ok(Returnable::Evaluate(wrap(Data::new(
-                    self.file_data.clone(),
-                    self.start.clone(),
-                    self.end.clone(),
-                    DataType::Null,
-                ))))
+                Ok(Returnable::Evaluate(Data::null(self.file_data.clone(), self.start.clone(), self.end.clone())))
             }
             InstructionType::IfStatement {
                 condition,
@@ -285,7 +266,6 @@ impl Instruction {
             } => {
                 if (condition.is_some()
                     && returnable!(condition.as_ref().unwrap().visit(context_ptr)?)
-                        .borrow()
                         .as_bool()?)
                     || condition.is_none()
                 {
@@ -293,23 +273,13 @@ impl Instruction {
                 } else if else_value.is_some() {
                     else_value.as_ref().unwrap().visit(context_ptr)
                 } else {
-                    Ok(Returnable::Evaluate(wrap(Data::new(
-                        self.file_data.clone(),
-                        self.start.clone(),
-                        self.end.clone(),
-                        DataType::Null,
-                    ))))
+                    Ok(Returnable::Evaluate(Data::null(self.file_data.clone(), self.start.clone(), self.end.clone())))
                 }
             }
             InstructionType::WhileStatement { condition, body } => {
-                let mut return_value = Returnable::Evaluate(wrap(Data::new(
-                    self.file_data.clone(),
-                    self.start.clone(),
-                    self.end.clone(),
-                    DataType::Null,
-                )));
-                while returnable!(condition.visit(context_ptr)?)
-                    .try_borrow()
+                let mut return_value = Returnable::Evaluate(Data::null(self.file_data.clone(), self.start.clone(), self.end.clone()));
+                while condition
+                    .visit(context_ptr)?
                     .unwrap()
                     .as_bool()?
                 {
@@ -326,7 +296,7 @@ impl Instruction {
             }
             InstructionType::Section { body } => Ok(run_with_instructions(
                 body,
-                &mut Context::new(Some(context_ptr), self.file_data.clone()),
+                &mut Context::new(context_ptr, self.file_data.clone()),
                 self.file_data.clone(),
             )?),
             InstructionType::ReturnStatement { value } => {
@@ -364,12 +334,7 @@ impl Instruction {
                     identifier.clone(),
                     context_ptr,
                 ));
-                Ok(Returnable::Evaluate(wrap(Data::new(
-                    self.file_data.clone(),
-                    self.start.clone(),
-                    self.end.clone(),
-                    DataType::Null,
-                ))))
+                Ok(Returnable::Evaluate(Data::null(self.file_data.clone(), self.start.clone(), self.end.clone())))
             }
             InstructionType::FunctionCall {
                 identifier,
@@ -398,10 +363,9 @@ impl Instruction {
                 value,
             } => Ok(Returnable::Evaluate(
                 returnable!(value.visit(context_ptr)?)
-                    .borrow()
                     .convert_to(convert_type)?,
             )),
-            InstructionType::DocComment { comment: _, value } => value.visit(context_ptr),
+                InstructionType::DocComment { comment: _, value } => value.visit(context_ptr),
             InstructionType::ClassDeclaration { identifier, body } => {
                 let class = Class::new(
                     identifier.clone(),
@@ -413,12 +377,7 @@ impl Instruction {
                     context_ptr,
                 )?;
                 context_ref.declare_class(class);
-                Ok(Returnable::Evaluate(wrap(Data::new(
-                    self.file_data.clone(),
-                    self.start.clone(),
-                    self.end.clone(),
-                    DataType::Null,
-                ))))
+                Ok(Returnable::Evaluate(Data::null(self.file_data.clone(), self.start.clone(), self.end.clone())))
             }
             InstructionType::ClassInstantiation {
                 identifier,
@@ -441,14 +400,14 @@ impl Instruction {
             )?)),
             InstructionType::InContextOf { context_of, run } => {
                 let context_of = returnable!(context_of.visit(context_ptr)?);
-                let reference = context_of.borrow().data_type.original();
+                let reference = context_of.data_type.original();
                 match reference {
                     DataType::Class(mut v) => {
                         let parent = v.context.parent.clone();
                         v.context.parent = Some(context_ptr);
                         let return_value = run.visit(&mut v.context);
                         v.context.parent = parent;
-                        return_value
+                        Ok(return_value?)
                     }
                     _ => Err(CantRunInContext::call(
                         &self.start,
@@ -458,12 +417,12 @@ impl Instruction {
                     )),
                 }
             }
-            InstructionType::Pass => Ok(Returnable::Evaluate(wrap(Data::new(
+            InstructionType::Pass => Ok(Returnable::Evaluate(Data::new(
                 self.file_data.clone(),
                 self.start.clone(),
                 self.end.clone(),
                 DataType::Null,
-            )))),
+            ))),
         }
     }
 }

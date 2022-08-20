@@ -7,7 +7,7 @@ use crate::{
     exceptions::parser_exceptions::{
         InvalidInstructionInClass, UnexpectedToken, UnterminatedParenthesis,
     },
-    interpreter::function::{Type, TypeHint},
+    interpreter::type_hint::{Type, TypeHint},
     lexer::token::{Token, TokenType},
     Annotation, FileData, Keyword, Position,
 };
@@ -308,7 +308,7 @@ impl Parser {
     fn atom(&mut self) -> Instruction {
         let instruction = match self.current_token().cloned() {
             Some(token) => {
-                // TODO: Maybe there's a way to avoid cloning the token
+                // : Maybe there's a way to avoid cloning the token
                 match token.token_type {
                     TokenType::Keyword(keyword) => match keyword {
                         Keyword::If => self.if_statement(),
@@ -852,7 +852,6 @@ impl Parser {
         }
         self.advance();
         let body = self.parse_section();
-        self.retreat();
         Instruction::new(
             start,
             self.current_token().unwrap().end.clone(),

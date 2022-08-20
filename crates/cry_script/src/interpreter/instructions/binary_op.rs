@@ -2,7 +2,6 @@ use std::fmt::Display;
 
 use crate::{
     exceptions::{parser_exceptions::UnexpectedToken, Exception},
-    interpreter::DataRef,
     lexer::token::{Token, TokenType},
     parser::data::{Data, DataType},
 };
@@ -27,7 +26,6 @@ pub(crate) enum BinaryOperator {
     GreaterThan,
     LesserEquals,
     LesserThan,
-
     And,
     Or,
 }
@@ -35,8 +33,8 @@ pub(crate) enum BinaryOperator {
 impl BinaryOperator {
     pub(crate) fn operate(
         &self,
-        n1: DataRef,
-        n2: DataRef,
+        n1: &Data,
+        n2: &Data,
         data1: &Data,
         data2: &Data,
     ) -> Result<Data, Exception> {
@@ -53,7 +51,6 @@ impl BinaryOperator {
             BinaryOperator::GreaterThan => Ok(data1.gt(&n2)?),
             BinaryOperator::LesserEquals => Ok(data1.leq(&n2)?),
             BinaryOperator::LesserThan => Ok(data1.lt(&n2)?),
-
             BinaryOperator::And => Ok(Data::new(
                 data1.file_data.clone(),
                 data1.start.clone(),

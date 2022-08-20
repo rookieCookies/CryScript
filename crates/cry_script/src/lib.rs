@@ -4,6 +4,7 @@ pub mod exceptions;
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
+pub mod variables;
 
 use std::{fmt::Display, fs::File, io::Read, rc::Rc, time::Instant};
 
@@ -13,34 +14,32 @@ use include_dir::{include_dir, Dir};
 use interpreter::{
     context::Context,
     instructions::{Instruction, InstructionType},
-    DataRef,
 };
 use parser::{data::Data, Parser};
-use utils::wrap;
+use variables::{Variables};
 
 use self::lexer::Lexer;
 
 const STD_DIR: Dir = include_dir!("std_lib/");
-const STD_FILES: [&str; 2] = ["std_rand", "std_math"];
+const STD_FILES: [&str; 3] = ["std_rand", "std_math", "std_file"];
 
 pub fn run(root_file_path: &str) -> u128 {
+    let mut variables = Variables::new();
+    
     let mut file_data = String::new();
     match File::open(root_file_path) {
         Ok(v) => v,
-        Err(_) => {
-            println!("{}", ("Unable to find provided startup file"));
-            std::process::exit(0)
-        }
+        Err(_) => Exception::new("Err: Unable to find startup fine".red().bold().to_string()).run()
     }
     .read_to_string(&mut file_data)
     .unwrap();
-    file_data.push('\0');
-    let mut context = Context::new(
-        None,
+    // file_data.push('\0');
+    let mut context = Context::new_root(
         Rc::new(FileData {
             data: file_data,
             path: root_file_path.to_string(),
         }),
+        &mut variables
     );
     match Context::import_data(
         &mut context,
@@ -65,7 +64,7 @@ pub fn run(root_file_path: &str) -> u128 {
     );
     let time = Instant::now();
     match run_from_file(root_file_path, &mut context) {
-        Ok(_) => {}
+        Ok(_) => {},
         Err(v) => v.run(),
     };
     time.elapsed().as_nanos()
@@ -142,12 +141,7 @@ pub(crate) fn run_with_instructions(
         }
     }
 
-    let mut return_value = wrap(Data::new(
-        file_data,
-        start,
-        end,
-        parser::data::DataType::Null,
-    ));
+    let mut return_value = Data::new(file_data, start, end, parser::data::DataType::Null);
     for instruction in instructions {
         if matches!(
             instruction.instruction_type,
@@ -256,17 +250,17 @@ impl Display for Keyword {
 
 #[derive(Debug)]
 pub enum Returnable {
-    Return(DataRef),
-    Evaluate(DataRef),
-    Break(DataRef),
+    Return(Data),
+    Evaluate(Data),
+    Break(Data),
 }
 
 impl Returnable {
-    pub(crate) fn unwrap(&self) -> DataRef {
+    pub(crate) fn unwrap(self) -> Data {
         match self {
-            Returnable::Return(v) => v.clone(),
-            Returnable::Evaluate(v) => v.clone(),
-            Returnable::Break(v) => v.clone(),
+            Returnable::Return(v) => v,
+            Returnable::Evaluate(v) => v,
+            Returnable::Break(v) => v,
         }
     }
 }
@@ -282,9 +276,9 @@ impl Display for Returnable {
                 Returnable::Break(_) => "break",
             },
             match self {
-                Returnable::Return(v) => v.try_borrow().unwrap().data_type.to_string(),
-                Returnable::Evaluate(v) => v.try_borrow().unwrap().data_type.to_string(),
-                Returnable::Break(v) => v.try_borrow().unwrap().data_type.to_string(),
+                Returnable::Return(v) => v.data_type.to_string(),
+                Returnable::Evaluate(v) => v.data_type.to_string(),
+                Returnable::Break(v) => v.data_type.to_string(),
             }
         )
     }

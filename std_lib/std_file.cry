@@ -1,0 +1,24 @@
+class File {
+    var path : str
+    var data : str
+
+    fn constructor(file_path : str) {
+        path = file_path
+        std_create_file(path)
+    }
+
+    fn contents() {
+        if data == null {
+            data = std_contents_of_file(path)
+        }
+        data
+    }
+
+    fn write_all(dta : str) {
+        std_write_to_file(path, dta)
+    }
+    
+    fn clear() {
+        std_clear_file(path)
+    }
+}

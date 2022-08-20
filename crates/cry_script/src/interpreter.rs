@@ -1,23 +1,24 @@
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
-use utils::wrap;
-
 use crate::{
     exceptions::{parser_exceptions::InvalidInstructionInClass, Exception},
     parser::data::{Data, DataType},
+    variables::Variable,
     AsString, FileData, Position,
 };
 
 use self::{
     context::Context,
-    function::{Function, Type, TypeHint},
+    function::Function,
     instructions::{Instruction, InstructionType},
+    type_hint::{Type, TypeHint},
 };
 
 mod built_in_functions;
 pub mod context;
 pub mod function;
 pub mod instructions;
+pub mod type_hint;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Table<T: AsString> {
@@ -45,41 +46,11 @@ impl<T: AsString> Display for Table<T> {
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct Variable {
-    data: DataRef,
-    type_hint: Type,
-    is_final: bool,
-}
-
-impl Variable {
-    fn new(data: DataRef, type_hint: Type, is_final: bool) -> Self {
-        Self {
-            data,
-            type_hint,
-            is_final,
-        }
-    }
-}
-
-impl Display for Variable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "data: {} type: {} final: {}",
-            self.data.borrow().data_type,
-            self.type_hint.type_value,
-            self.is_final
-        )
-    }
-}
-
 pub type DataRef = Rc<RefCell<Data>>;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Class {
     identifier: String,
-    functions: Vec<(String, Rc<RefCell<Data>>)>,
     variables: Vec<(String, Variable)>,
     start: Position,
     end: Position,
@@ -93,8 +64,7 @@ impl Class {
         body: Vec<Instruction>,
         parent: *mut Context,
     ) -> Result<Self, Exception> {
-        let mut context = Context::new(Some(parent), unsafe { &*parent }.file_data.clone());
-        let mut functions = vec![];
+        let mut context = Context::new(parent, unsafe { &*parent }.file_data.clone());
         let mut variables = vec![];
         for i in body.into_iter() {
             match i.instruction_type {
@@ -104,7 +74,7 @@ impl Class {
                     type_hint,
                     is_final,
                 } => variables.push((
-                    identifier,
+                    identifier.clone(),
                     Variable::new(
                         match data.visit(&mut context)? {
                             crate::Returnable::Return(v) => v,
@@ -113,6 +83,7 @@ impl Class {
                         },
                         type_hint,
                         is_final,
+                        identifier.clone(),
                     ),
                 )),
                 InstructionType::FunctionDeclaration {
@@ -120,21 +91,21 @@ impl Class {
                     body,
                     arguments,
                 } => {
-                    functions.push((
+                    variables.push((
                         identifier.clone(),
-                        wrap(Data::new(
+                        Variable::new(Data::new(
                             body.file_data.clone(),
                             body.start.clone(),
                             body.end.clone(),
                             DataType::Function(Box::new(Function::new(
                                 &arguments,
                                 *body.clone(),
-                                body.start,
-                                body.end,
-                                identifier,
+                                body.start.clone(),
+                                body.end.clone(),
+                                identifier.clone(),
                                 &mut context,
                             ))),
-                        )),
+                        ), Type::new(TypeHint::None, body.start.clone(), body.end.clone(), body.file_data.clone()), true, identifier),
                     ));
                 }
                 _ => InvalidInstructionInClass::call(&i.start, &i.end, &i.file_data),
@@ -142,7 +113,6 @@ impl Class {
         }
         Ok(Self {
             identifier,
-            functions,
             variables,
             start,
             end,
@@ -177,30 +147,26 @@ impl ClassVariable {
     fn new(
         class: &Class,
         parent: *mut Context,
-        args: Vec<DataRef>,
+        args: Vec<Data>,
         (start, end, file_data): (Position, Position, Rc<FileData>),
     ) -> Result<Self, Exception> {
-        let mut context = Context::new(Some(parent), unsafe { &*parent }.file_data.clone());
-        let none = Type::new(
-            TypeHint::None,
-            class.start.clone(),
-            class.end.clone(),
-            class.file_data.clone(),
-        );
+        let mut context = Context::new(parent, unsafe { &*parent }.file_data.clone());
         for variable in class.variables.iter() {
             context.declare_variable(variable.0.clone(), variable.1.clone())?;
         }
-        for function in class.functions.iter() {
-            context.add_var(function.0.clone(), none.clone(), true, function.1.clone());
-        }
-        if context.variables.map.contains_key("constructor") {
+        if context
+            .variables_defined_in_this_scope
+            .contains_key("constructor")
+        {
             Context::call_fn_no_std(
                 &mut context,
                 &"constructor".to_string(),
                 args,
                 (&start, &end, &file_data),
             )?;
-            context.variables.map.remove(&"constructor".to_string());
+            context
+                .variables_defined_in_this_scope
+                .remove(&"constructor".to_string());
         }
         Ok(Self {
             class_name: class.identifier.clone(),
@@ -217,7 +183,7 @@ impl Display for ClassVariable {
         write!(
             f,
             "{} variables: {} classes: {}",
-            self.class_name, self.context.variables, self.context.classes
+            self.class_name, self.context.variables_defined_in_this_scope.iter().map(|x| format!("{} ", x.0)).collect::<String>(), self.context.classes
         )
     }
 }

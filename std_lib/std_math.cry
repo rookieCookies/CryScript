@@ -90,3 +90,61 @@ class Vector2 {
         distance(other_vector) ^ 2
     }
 }
+
+
+class Vector2i {
+    var x : int = 0
+    var y : int = 0
+
+    fn constructor(l_x: int, l_y: int) {
+        x = l_x
+        y = l_y
+    }
+
+    fn add(other_vector: Vector2i) {
+        x += other_vector.x
+        y += other_vector.y
+    }
+
+    fn subtract(other_vector: Vector2i) {
+        x -= other_vector.x
+        y -= other_vector.y
+    }
+
+    fn multiply(other_vector: Vector2i) {
+        x *= other_vector.x
+        y *= other_vector.y
+    }
+
+    fn divide(other_vector: Vector2i) {
+        x /= other_vector.x
+        y /= other_vector.y
+    }
+
+    fn pow(other_vector: Vector2i) {
+        x ^= other_vector.x
+        y ^= other_vector.y
+    }
+
+    fn equals(other_vector: Vector2i) {
+        x == other_vector.x && x == other_vector.x
+    }
+
+    fn length() {
+        Math.sqrt(x ^ 2 + y ^ 2)
+    }
+
+    fn length_squared() {
+        length() ^ 2
+    }
+
+    fn distance(other_vector: Vector2i) {
+        var xd = other_vector.x - x
+        var yd = other_vector.y - y
+        Math.sqrt(xd ^ 2 + y ^ 2)
+    }
+
+    fn distance(other_vector: Vector2i) {
+        distance(other_vector) ^ 2
+    }
+}

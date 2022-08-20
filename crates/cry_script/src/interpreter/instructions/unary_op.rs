@@ -1,10 +1,7 @@
 use std::fmt::Display;
 
-use utils::wrap;
-
 use crate::{
     exceptions::{parser_exceptions::UnexpectedToken, Exception},
-    interpreter::DataRef,
     lexer::token::{Token, TokenType},
     parser::data::{Data, DataType},
 };
@@ -17,27 +14,25 @@ pub(crate) enum UnaryOperator {
 }
 
 impl UnaryOperator {
-    pub(crate) fn operate(&self, n: DataRef, data: &Data) -> Result<Data, Exception> {
+    pub(crate) fn operate(&self, n: &Data, data: &Data) -> Result<Data, Exception> {
         Ok(match self {
-            UnaryOperator::Minus => {
-                let rhs = wrap(Data::new(
-                    data.file_data.clone(),
-                    data.start.clone(),
-                    data.end.clone(),
-                    DataType::Integer(-1),
-                ));
-                let borrowed = &*rhs.borrow();
-                Data::mul(n, rhs.clone(), data, borrowed)?
-            }
+            // UnaryOperator::Minus => {
+            //     let rhs = Data::new(
+            //         data.file_data.clone(),
+            //         data.start.clone(),
+            //         data.end.clone(),
+            //         DataType::Integer(-1),
+            //     );
+            //     Data::mul(n, rhs, data, borrowed)?
+            // }
             UnaryOperator::Plus => {
-                let rhs = wrap(Data::new(
+                let rhs = Data::new(
                     data.file_data.clone(),
                     data.start.clone(),
                     data.end.clone(),
                     DataType::Integer(0),
-                ));
-                let borrowed = &*rhs.borrow();
-                Data::add(n, rhs.clone(), data, borrowed)?
+                );
+                Data::add(n, &rhs, data, rhs.original())?
             }
             UnaryOperator::Not => Data::new(
                 data.file_data.clone(),
@@ -45,6 +40,7 @@ impl UnaryOperator {
                 data.end.clone(),
                 (!data.as_bool()?).into(),
             ),
+            _ => panic!()
         })
     }
 }

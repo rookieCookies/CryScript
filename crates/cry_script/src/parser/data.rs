@@ -1,7 +1,5 @@
 use std::{cell::RefCell, fmt::Display, rc::Rc};
 
-use utils::wrap;
-
 use crate::{
     exceptions::{
         interpreter_exceptions::{
@@ -12,10 +10,12 @@ use crate::{
     },
     interpreter::{
         context::Context,
-        function::{Function, Type, TypeHint},
-        ClassVariable, DataRef,
+        function::Function,
+        type_hint::{Type, TypeHint},
+        ClassVariable,
     },
     lexer::token::{Token, TokenType},
+    variables::VariableReference,
     FileData, Position,
 };
 
@@ -26,7 +26,7 @@ pub(crate) enum DataType {
     String(String),
     Function(Box<Function>),
     Class(Box<ClassVariable>),
-    Reference(DataRef),
+    Reference(VariableReference),
     Null,
 }
 
@@ -39,7 +39,7 @@ impl DataType {
             DataType::Null => "null".to_string(),
             DataType::Function(_) => "function".to_string(),
             DataType::Class(v) => v.class_name.clone(),
-            DataType::Reference(v) => format!("ref({})", v.borrow().data_type.data_type()),
+            DataType::Reference(v) => format!("ref({})", (**v).data.data_type.data_type()),
         }
     }
 
@@ -54,20 +54,9 @@ impl DataType {
             | (TypeHint::String, crate::parser::data::DataType::String(_))
             | (TypeHint::Float, crate::parser::data::DataType::Float(_))
             | (TypeHint::None, _) => Ok(true),
-            (TypeHint::Class(type_identifier), crate::parser::data::DataType::Class(class)) => {
-                if &class.class_name == type_identifier {
-                    Ok(&class.class_name == type_identifier)
-                } else {
-                    Err(InvalidType::call(
-                        start,
-                        end,
-                        file_data,
-                        identifier,
-                        &t.type_value,
-                        self,
-                    ))
-                }
-            },
+            (TypeHint::Class(identifier), crate::parser::data::DataType::Class(class)) => {
+                Ok(&class.class_name == identifier)
+            }
             (_, Self::Null) => Ok(true),
             _ => Err(InvalidType::call(
                 start,
@@ -82,7 +71,7 @@ impl DataType {
 
     pub fn original(&self) -> Self {
         match self {
-            DataType::Reference(v) => (*v.borrow()).data_type.original(),
+            DataType::Reference(v) => (**v).data.data_type.original(),
             _ => self.clone(),
         }
     }
@@ -123,19 +112,15 @@ impl From<&Token> for DataType {
 
 impl Display for DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                DataType::Integer(v) => v.to_string(),
-                DataType::Float(v) => v.to_string(),
-                DataType::String(v) => v.to_string(),
-                DataType::Function(v) => v.identifier.clone(),
-                DataType::Reference(v) => v.borrow().data_type.to_string(),
-                DataType::Null => "null".to_string(),
-                DataType::Class(v) => v.to_string(),
-            }
-        )
+        match self {
+            DataType::Integer(v) => write!(f, "{}", v),
+            DataType::Float(v) => write!(f, "{}", v),
+            DataType::String(v) => write!(f, "{}", v),
+            DataType::Function(v) => write!(f, "{}", v.identifier),
+            DataType::Reference(v) => write!(f, "{}", (**v).data.data_type),
+            DataType::Null => write!(f, "null"),
+            DataType::Class(v) => write!(f, "{}", v.class_name),
+        }
     }
 }
 
@@ -193,41 +178,31 @@ impl Data {
             DataType::String(v) => !v.is_empty(),
             DataType::Function(_) => false,
             DataType::Null => false,
-            DataType::Reference(v) => v.borrow().as_bool()?,
+            DataType::Reference(v) => (*v).data.as_bool()?,
             DataType::Class(mut v) => Context::call_function(
                 &mut v.context,
                 &"as_bool".to_string(),
                 vec![],
                 (&v.start, &v.end, &v.file_data),
             )?
-            .borrow()
             .as_bool()?,
         })
     }
 
-    pub fn original(slf: &DataRef) -> DataRef {
-        match &slf.borrow().data_type {
-            DataType::Reference(v) => Data::original(v),
-            _ => slf.clone(),
+    pub fn original(&self) -> &Data {
+        match &self.data_type {
+            DataType::Reference(v) => (*v).data.original(),
+            _ => self,
+        }
+    }
+
+    pub fn original_mut(&mut self) -> &mut Data {
+        match &self.data_type {
+            DataType::Reference(v) => unsafe{&mut *((*v).data.original() as *const Data as *mut Data)},
+            _ => self,
         }
     }
 }
-
-// impl Data {
-//     fn as_bool(&self) -> Result<bool, Exception> {
-//         match &self.data_type {
-//             DataType::Integer(v) => Ok(*v > 0),
-//             DataType::Float(v) => Ok(*v > 0.),
-//             _ => Err(TypeConversion::call(
-//                 &self.start,
-//                 &self.end,
-//                 &self.file_data,
-//                 &self.data_type,
-//                 "bool",
-//             )),
-//         }
-//     }
-// }
 
 impl From<&Token> for Data {
     fn from(v: &Token) -> Self {
@@ -242,41 +217,41 @@ impl From<&Token> for Data {
 
 impl Data {
     #[inline(always)]
-    pub fn eq(&self, other: &DataRef) -> Result<Data, Exception> {
+    pub fn eq(&self, other: &Data) -> Result<Data, Exception> {
         Ok(Data::new(
             self.file_data.clone(),
             self.start.clone(),
-            other.borrow().end.clone(),
+            other.end.clone(),
             DataType::Integer(if data_eq(&self, &other)? { 1 } else { 0 }),
         ))
     }
 
     #[inline(always)]
-    pub fn ne(&self, other: &DataRef) -> Result<Data, Exception> {
+    pub fn ne(&self, other: &Data) -> Result<Data, Exception> {
         Ok(Data::new(
             self.file_data.clone(),
             self.start.clone(),
-            other.borrow().end.clone(),
+            other.end.clone(),
             DataType::Integer(if !data_eq(&self, &other)? { 1 } else { 0 }),
         ))
     }
 
     #[inline(always)]
-    pub fn gt(&self, other: &DataRef) -> Result<Data, Exception> {
+    pub fn gt(&self, other: &Data) -> Result<Data, Exception> {
         Ok(Data::new(
             self.file_data.clone(),
             self.start.clone(),
-            other.borrow().end.clone(),
+            other.end.clone(),
             DataType::Integer(if data_gt(&self, other)? { 1 } else { 0 }),
         ))
     }
 
     #[inline(always)]
-    pub fn geq(&self, other: &DataRef) -> Result<Data, Exception> {
+    pub fn geq(&self, other: &Data) -> Result<Data, Exception> {
         Ok(Data::new(
             self.file_data.clone(),
             self.start.clone(),
-            other.borrow().end.clone(),
+            other.end.clone(),
             DataType::Integer(if data_gt(&self, &other)? || data_eq(&self, &other)? {
                 1
             } else {
@@ -286,11 +261,11 @@ impl Data {
     }
 
     #[inline(always)]
-    pub fn lt(&self, other: &DataRef) -> Result<Data, Exception> {
+    pub fn lt(&self, other: &Data) -> Result<Data, Exception> {
         Ok(Data::new(
             self.file_data.clone(),
             self.start.clone(),
-            other.borrow().end.clone(),
+            other.end.clone(),
             DataType::Integer(if !data_gt(&self, &other)? && !data_eq(&self, &other)? {
                 1
             } else {
@@ -300,19 +275,19 @@ impl Data {
     }
 
     #[inline(always)]
-    pub fn leq(&self, other: &DataRef) -> Result<Data, Exception> {
+    pub fn leq(&self, other: &Data) -> Result<Data, Exception> {
         Ok(Data::new(
             self.file_data.clone(),
             self.start.clone(),
-            other.borrow().end.clone(),
+            other.end.clone(),
             DataType::Integer(if !data_gt(&self, other)? { 1 } else { 0 }),
         ))
     }
 
     #[inline(always)]
     pub(crate) fn add(
-        slf: DataRef,
-        rhs: DataRef,
+        slf: &Data,
+        rhs: &Data,
         data1: &Data,
         data2: &Data,
     ) -> Result<Data, Exception> {
@@ -328,23 +303,16 @@ impl Data {
                 }
                 (DataType::Float(n1), DataType::Integer(n2)) => DataType::Float(n1 + *n2 as f32),
                 (DataType::Float(n1), DataType::Float(n2)) => DataType::Float(n1 + n2),
-                (DataType::Float(n1), DataType::String(n2)) => {
-                    DataType::String(format!("{}{}", n1, n2))
-                }
-                (DataType::String(n1), DataType::String(n2)) => {
-                    DataType::String(format!("{}{}", n1, n2))
-                }
-                (DataType::String(n1), DataType::Integer(n2)) => {
-                    DataType::String(format!("{}{}", n1, n2))
-                }
-                (DataType::String(n1), DataType::Float(n2)) => {
-                    DataType::String(format!("{}{}", n1, n2))
-                }
+                (DataType::String(_), _) | (_, DataType::String(_)) => DataType::String({
+                    let mut str : String = data1.data_type.to_string();
+                    str += data2.data_type.to_string().as_str();
+                    str
+                }),
                 _ => {
                     return Err(InvalidBinaryOperation::call(
-                        &slf.borrow().start,
-                        &rhs.borrow().end,
-                        &slf.borrow().file_data,
+                        &slf.start,
+                        &rhs.end,
+                        &slf.file_data,
                         (&data1.data_type, &data2.data_type),
                         "add",
                     ))
@@ -355,8 +323,8 @@ impl Data {
 
     #[inline(always)]
     pub(crate) fn sub(
-        slf: DataRef,
-        rhs: DataRef,
+        slf: &Data,
+        rhs: &Data,
         data1: &Data,
         data2: &Data,
     ) -> Result<Data, Exception> {
@@ -371,9 +339,9 @@ impl Data {
                 (DataType::Float(n1), DataType::Float(n2)) => DataType::Float(n1 - n2),
                 _ => {
                     return Err(InvalidBinaryOperation::call(
-                        &slf.borrow().start,
-                        &rhs.borrow().end,
-                        &slf.borrow().file_data,
+                        &slf.start,
+                        &rhs.end,
+                        &slf.file_data,
                         (&data1.data_type, &data2.data_type),
                         "subtract",
                     ))
@@ -384,8 +352,8 @@ impl Data {
 
     #[inline(always)]
     pub(crate) fn mul(
-        slf: DataRef,
-        rhs: DataRef,
+        slf: &Data,
+        rhs: &Data,
         data1: &Data,
         data2: &Data,
     ) -> Result<Data, Exception> {
@@ -407,9 +375,9 @@ impl Data {
                 }
                 _ => {
                     return Err(InvalidBinaryOperation::call(
-                        &slf.borrow().start,
-                        &rhs.borrow().end,
-                        &slf.borrow().file_data,
+                        &slf.start,
+                        &rhs.end,
+                        &slf.file_data,
                         (&data1.data_type, &data2.data_type),
                         "multiply",
                     ))
@@ -420,8 +388,8 @@ impl Data {
 
     #[inline(always)]
     pub(crate) fn div(
-        slf: DataRef,
-        rhs: DataRef,
+        slf: &Data,
+        rhs: &Data,
         data1: &Data,
         data2: &Data,
     ) -> Result<Data, Exception> {
@@ -433,9 +401,9 @@ impl Data {
             _ => false,
         } {
             return Err(IntegerDivisionByZero::call(
-                &rhs.borrow().start,
-                &rhs.borrow().end,
-                &rhs.borrow().file_data,
+                &rhs.start,
+                &rhs.end,
+                &rhs.file_data,
             ));
         }
         Ok(Data::new(
@@ -449,9 +417,9 @@ impl Data {
                 (DataType::Float(n1), DataType::Float(n2)) => DataType::Float(n1 / n2),
                 _ => {
                     return Err(InvalidBinaryOperation::call(
-                        &slf.borrow().start,
-                        &rhs.borrow().end,
-                        &slf.borrow().file_data,
+                        &slf.start,
+                        &rhs.end,
+                        &slf.file_data,
                         (&data1.data_type, &data2.data_type),
                         "division",
                     ))
@@ -462,8 +430,8 @@ impl Data {
 
     #[inline(always)]
     pub(crate) fn pow(
-        slf: DataRef,
-        rhs: DataRef,
+        slf: &Data,
+        rhs: &Data,
         data1: &Data,
         data2: &Data,
     ) -> Result<Data, Exception> {
@@ -489,9 +457,9 @@ impl Data {
                 }
                 _ => {
                     return Err(InvalidBinaryOperation::call(
-                        &slf.borrow().start,
-                        &rhs.borrow().end,
-                        &slf.borrow().file_data,
+                        &slf.start,
+                        &rhs.end,
+                        &slf.file_data,
                         (&data1.data_type, &data2.data_type),
                         "multiply",
                     ))
@@ -502,37 +470,35 @@ impl Data {
 }
 
 impl Data {
-    pub(crate) fn null(file_data: Rc<FileData>) -> Data {
+    pub(crate) fn null(file_data: Rc<FileData>, start: Position, end: Position) -> Data {
         Self {
             file_data,
-            start: Position::new(0),
-            end: Position::new(0),
+            start,
+            end,
             data_type: DataType::Null,
         }
     }
 
+    pub(crate) fn null_zero(file_data: Rc<FileData>) -> Data {
+        Self::null(file_data, Position::new(0), Position::new(0))
+    }
+
     #[inline(always)]
-    pub fn convert_to(&self, convert_type: &Type) -> Result<DataRef, Exception> {
-        let exception = Err(TypeConversion::call(
-            &self.start,
-            &convert_type.end,
-            &convert_type.file_data,
-            &self.data_type,
-            convert_type.type_value.to_string().as_str(),
-        ));
+    pub fn convert_to(&self, convert_type: &Type) -> Result<Data, Exception> {
+        // TODO: bruh
         let data = self.data_type.original();
-        Ok(wrap(Data::new(
+        Ok(Data::new(
             self.file_data.clone(),
             self.start.clone(),
             convert_type.end.clone(),
-            match (&convert_type.type_value, &data) {
+            match (&convert_type.type_value, &data.original()) {
                 (TypeHint::Integer, DataType::Integer(_)) => self.data_type.clone(),
                 (TypeHint::Integer, DataType::Float(i)) => DataType::Integer(*i as i32),
                 (TypeHint::Integer, DataType::String(i)) => DataType::Integer(match i.parse() {
                     Ok(v) => v,
-                    Err(_) => return exception,
+                    Err(_) => return convert_exception(self, convert_type),
                 }),
-                (TypeHint::Integer, DataType::Null) => return exception,
+                (TypeHint::Integer, DataType::Null) => return convert_exception(self, convert_type),
                 (TypeHint::String, DataType::Integer(i)) => DataType::String(i.to_string()),
                 (TypeHint::String, DataType::Float(i)) => DataType::String(i.to_string()),
                 (TypeHint::String, DataType::String(_)) => self.data_type.clone(),
@@ -541,18 +507,28 @@ impl Data {
                 (TypeHint::Float, DataType::Float(_)) => self.data_type.clone(),
                 (TypeHint::Float, DataType::String(i)) => DataType::Float(match i.parse() {
                     Ok(v) => v,
-                    Err(_) => return exception,
+                    Err(_) => return convert_exception(self, convert_type),
                 }),
-                (TypeHint::Float, DataType::Null) => return exception,
-                _ => return exception,
+                (TypeHint::Float, DataType::Null) => return convert_exception(self, convert_type),
+                _ => return convert_exception(self, convert_type),
             },
-        )))
+        ))
     }
 }
 
-fn data_eq(n1: &Data, n2: &DataRef) -> Result<bool, Exception> {
+fn convert_exception(data: &Data, convert_type: &Type) -> Result<Data, Exception> {
+    Err(TypeConversion::call(
+        &data.start,
+        &convert_type.end,
+        &convert_type.file_data,
+        &data.data_type.original(),
+        convert_type.type_value.to_string().as_str(),
+    ))
+}
+
+fn data_eq(n1: &Data, n2: &Data) -> Result<bool, Exception> {
     Ok(
-        match (n1.data_type.original(), &n2.borrow().data_type.original()) {
+        match (n1.data_type.original(), &n2.data_type.original()) {
             (DataType::Integer(v1), DataType::Integer(v2)) => &v1 == v2,
             (DataType::Integer(v1), DataType::Float(v2)) => v1 as f32 == *v2,
             (DataType::Integer(v1), DataType::String(v2)) => &v1.to_string() == v2,
@@ -563,21 +539,21 @@ fn data_eq(n1: &Data, n2: &DataRef) -> Result<bool, Exception> {
             (DataType::String(v1), DataType::Float(v2)) => &v1 == &v2.to_string(),
             (DataType::String(v1), DataType::String(v2)) => &v1 == v2,
             (DataType::Null, DataType::Null) => true,
+            (DataType::Class(_), DataType::Null) | (DataType::Null, DataType::Class(_)) => false,
             (DataType::Class(mut v), _) => Context::call_override_class_fn(
                 &mut v.context,
                 &"equals".to_string(),
                 vec![n2.clone()],
-                (&n1.start, &n2.borrow().end, &n1.file_data),
+                (&n1.start, &n2.end, &n1.file_data),
             )?
-            .borrow()
             .as_bool()?,
             _ => false,
         },
     )
 }
 
-fn data_gt(n1: &Data, n2: &DataRef) -> Result<bool, Exception> {
-    Ok(match (n1.data_type.original(), &n2.borrow().data_type) {
+fn data_gt(n1: &Data, n2: &Data) -> Result<bool, Exception> {
+    Ok(match (n1.data_type.original(), &n2.data_type.original()) {
         (DataType::Integer(v1), DataType::Integer(v2)) => &v1 > v2,
         (DataType::Integer(v1), DataType::Float(v2)) => (v1) as f32 > *v2,
         (DataType::Integer(v1), DataType::String(v2)) => v1 > (v2.len() as i32),
@@ -591,15 +567,9 @@ fn data_gt(n1: &Data, n2: &DataRef) -> Result<bool, Exception> {
             &mut v.context,
             &"greater".to_string(),
             vec![n2.clone()],
-            (&n1.start, &n2.borrow().end, &n1.file_data),
+            (&n1.start, &n2.end, &n1.file_data),
         )?
-        .borrow()
         .as_bool()?,
         _ => false,
     })
-}
-
-#[inline(always)]
-pub fn original_data(slf: &DataRef) -> DataRef {
-    Data::original(slf)
 }

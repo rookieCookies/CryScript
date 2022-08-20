@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{interpreter::function::TypeHint, parser::data::DataType, FileData, Position};
+use crate::{interpreter::type_hint::TypeHint, parser::data::DataType, FileData, Position};
 
 use super::{Exception, PositionException, EXCEPTION};
 

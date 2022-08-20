@@ -1,17 +1,19 @@
-use std::{fmt::Display, rc::Rc};
+use std::{rc::Rc};
 
 use crate::{
     exceptions::{
         interpreter_exceptions::{InvalidAmountOfArguments, InvalidArgumentType},
-        parser_exceptions::NotATypeHint,
         Exception,
     },
-    lexer::token::Token,
-    parser::data::original_data,
+    parser::data::Data,
     FileData, Position,
 };
 
-use super::{context::Context, instructions::Instruction, DataRef};
+use super::{
+    context::Context,
+    instructions::Instruction,
+    type_hint::{Type, TypeHint},
+};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Function {
@@ -60,9 +62,9 @@ impl Function {
         &self,
         context: *mut Context,
         file_data: Rc<FileData>,
-        args: Vec<DataRef>,
-    ) -> Result<DataRef, Exception> {
-        let mut func_context = Context::new(Some(context), file_data.clone());
+        args: Vec<Data>,
+    ) -> Result<Data, Exception> {
+        let mut func_context = Context::new(context, file_data.clone());
 
         for (i, arg) in self.arguments.iter().enumerate() {
             match &arg.default_value {
@@ -91,32 +93,33 @@ impl Function {
             }
             match (
                 &arg.type_hint.type_value,
-                &original_data(&args[i]).borrow().data_type,
+                &args[i].original().data_type,
             ) {
                 (TypeHint::Integer, crate::parser::data::DataType::Integer(_))
                 | (TypeHint::String, crate::parser::data::DataType::String(_))
                 | (TypeHint::Float, crate::parser::data::DataType::Float(_))
-                | (TypeHint::None, _) => {}
+                | (TypeHint::None, _)
+                | (_, crate::parser::data::DataType::Null) => {}
                 (TypeHint::Class(v), crate::parser::data::DataType::Class(class)) => {
                     if &class.class_name != v {
                         return Err(InvalidArgumentType::call(
-                            &args[i].borrow().start,
-                            &args[i].borrow().end,
-                            &args[i].borrow().file_data,
+                            &args[i].start,
+                            &args[i].end,
+                            &args[i].file_data,
                             &arg.identifier,
                             &arg.type_hint.type_value,
-                            &args[i].borrow().data_type,
+                            &args[i].data_type,
                         ));
                     }
                 }
                 _ => {
                     return Err(InvalidArgumentType::call(
-                        &args[i].borrow().start,
-                        &args[i].borrow().end,
-                        &args[i].borrow().file_data,
+                        &args[i].start,
+                        &args[i].end,
+                        &args[i].file_data,
                         &arg.identifier,
                         &arg.type_hint.type_value,
-                        &args[i].borrow().data_type,
+                        &args[i].data_type,
                     ))
                 }
             }
@@ -126,9 +129,9 @@ impl Function {
                 arg.type_hint.clone(),
                 true,
                 (
-                    &args[i].borrow().start,
-                    &args[i].borrow().end,
-                    &args[i].borrow().file_data,
+                    &args[i].start,
+                    &args[i].end,
+                    &args[i].file_data,
                 ),
             )?;
         }
@@ -143,83 +146,15 @@ impl Function {
 pub(crate) struct Argument {
     identifier: String,
     type_hint: Type,
-    default_value: Option<DataRef>,
+    default_value: Option<Data>,
 }
 
 impl Argument {
-    pub(crate) fn new(identifier: String, type_hint: Type, default_value: Option<DataRef>) -> Self {
+    pub(crate) fn new(identifier: String, type_hint: Type, default_value: Option<Data>) -> Self {
         Self {
             identifier,
             type_hint,
             default_value,
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Type {
-    pub(crate) type_value: TypeHint,
-    pub(crate) start: Position,
-    pub(crate) end: Position,
-    pub(crate) file_data: Rc<FileData>,
-}
-
-impl Type {
-    pub(crate) fn new(
-        type_value: TypeHint,
-        start: Position,
-        end: Position,
-        file_data: Rc<FileData>,
-    ) -> Self {
-        Self {
-            type_value,
-            start,
-            end,
-            file_data,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub enum TypeHint {
-    Integer,
-    String,
-    Float,
-    Class(String),
-    None,
-}
-
-impl From<&Token> for Type {
-    fn from(tkn: &Token) -> Self {
-        Self::new(
-            match &tkn.token_type {
-                crate::lexer::token::TokenType::TypeHint(v) => match v {
-                    crate::lexer::token::TypeHintToken::Integer => TypeHint::Integer,
-                    crate::lexer::token::TypeHintToken::Float => TypeHint::Float,
-                    crate::lexer::token::TypeHintToken::String => TypeHint::String,
-                },
-                crate::lexer::token::TokenType::Identifier(v) => TypeHint::Class(v.clone()),
-                _ => NotATypeHint::call(&tkn.start, &tkn.end, &tkn.file_data, &tkn.token_type),
-            },
-            tkn.start.clone(),
-            tkn.end.clone(),
-            tkn.file_data.clone(),
-        )
-    }
-}
-
-impl Display for TypeHint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                TypeHint::Integer => "integer",
-                TypeHint::String => "string",
-                TypeHint::Float => "float",
-                TypeHint::Class(v) => v.as_str(),
-                TypeHint::None => "none",
-            }
-        )
     }
 }
