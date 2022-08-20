@@ -1,9 +1,11 @@
+use std::{fs::{File, self}, env::set_current_dir};
+
 use cry_script::run;
 
 fn main() {
-    let file_path = String::from("script.cry");
-    println!(
-        "\nExecuted in {}ms",
-        run(file_path.as_str()) as f64 / 1_000_000_f64,
-    );
+    let mut x = fs::canonicalize(std::env::current_exe().unwrap()).unwrap();
+    x.pop();
+    println!("{:?}", x);
+    set_current_dir(x).unwrap();
+    File::open("hello.txt").unwrap();
 }
