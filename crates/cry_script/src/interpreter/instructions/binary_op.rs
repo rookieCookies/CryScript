@@ -51,16 +51,17 @@ impl BinaryOperator {
             BinaryOperator::GreaterThan => Ok(data1.gt(n2)?),
             BinaryOperator::LesserEquals => Ok(data1.leq(n2)?),
             BinaryOperator::LesserThan => Ok(data1.lt(n2)?),
-            BinaryOperator::And => Ok(Data::new(
-                data1.file_data.clone(),
-                data1.start.clone(),
-                data2.end.clone(),
-                if data1.as_bool()? && data2.as_bool()? {
-                    DataType::Integer(1)
-                } else {
-                    DataType::Integer(0)
-                },
-            )),
+            BinaryOperator::And =>
+                Ok(Data::new(
+                    data1.file_data.clone(),
+                    data1.start.clone(),
+                    data2.end.clone(),
+                    if data1.as_bool()? && data2.as_bool()? {
+                        DataType::Integer(1)
+                    } else {
+                        DataType::Integer(0)
+                    },
+                )),
             BinaryOperator::Or => Ok(Data::new(
                 data1.file_data.clone(),
                 data1.start.clone(),

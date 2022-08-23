@@ -463,10 +463,10 @@ impl Parser {
                 | TokenType::PowerEquals
                 | TokenType::DivideEquals => change_assign(self),
                 TokenType::Equals => self.update_variable(),
-                _ => self.expr(),
+                _ => self.atom(),
             }
         } else {
-            self.expr()
+            self.atom()
         }
     }
 
@@ -766,6 +766,7 @@ impl Parser {
         self.advance();
         let body = self.parse_section();
         self.advance();
+        self.skip_new_line();
         let mut else_value: Option<Box<Instruction>> = None;
         while let Some(token) = self.current_token() {
             let start = token.start.clone();

@@ -8,9 +8,4 @@ edition = "2021"
 [dependencies]
 cry_script = { path = "crates/cry_script" }
 utils = { path = "crates/utils" }
-static-rc = "0.5.0"
 sysinfo = "*"
-
-[dependencies.pprof]
-version = "0.10.0"
-features = ["flamegraph"]

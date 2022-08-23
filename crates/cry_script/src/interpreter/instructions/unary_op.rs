@@ -16,15 +16,15 @@ pub(crate) enum UnaryOperator {
 impl UnaryOperator {
     pub(crate) fn operate(&self, n: &Data, data: &Data) -> Result<Data, Exception> {
         Ok(match self {
-            // UnaryOperator::Minus => {
-            //     let rhs = Data::new(
-            //         data.file_data.clone(),
-            //         data.start.clone(),
-            //         data.end.clone(),
-            //         DataType::Integer(-1),
-            //     );
-            //     Data::mul(n, rhs, data, borrowed)?
-            // }
+            UnaryOperator::Minus => {
+                let rhs = Data::new(
+                    data.file_data.clone(),
+                    data.start.clone(),
+                    data.end.clone(),
+                    DataType::Integer(-1),
+                );
+                Data::mul(n, &rhs, data, &rhs.original())?
+            }
             UnaryOperator::Plus => {
                 let rhs = Data::new(
                     data.file_data.clone(),
@@ -40,7 +40,6 @@ impl UnaryOperator {
                 data.end.clone(),
                 (!data.as_bool()?).into(),
             ),
-            _ => panic!(),
         })
     }
 }

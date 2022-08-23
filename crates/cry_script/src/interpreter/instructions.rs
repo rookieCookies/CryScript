@@ -179,6 +179,8 @@ impl Instruction {
                     }
                     _ => {
                         operator.operate(&base_left, &base_right, original_left, original_right)?
+                        // dbg!(&x.data_type, &operator, &base_left.data_type, base_right.data_type);
+                        // x
                     }
                 }))
             }
