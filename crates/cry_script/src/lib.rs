@@ -29,7 +29,7 @@ pub fn run(root_file_path: &str) -> u128 {
     let mut file_data = String::new();
     match File::open(root_file_path) {
         Ok(v) => v,
-        Err(_) => Exception::new("Err: Unable to find startup fine".red().bold().to_string()).run(),
+        Err(_) => Exception::new("Err: Unable to find startup file".red().bold().to_string()).run(),
     }
     .read_to_string(&mut file_data)
     .unwrap();

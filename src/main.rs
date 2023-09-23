@@ -6,10 +6,6 @@ use std::{
 use cry_script::run;
 
 fn main() {
-    let mut x = fs::canonicalize(std::env::current_exe().unwrap()).unwrap();
-    x.pop();
-    set_current_dir(x).unwrap();
-
     // let iterations = 1;
     // let mut number = 0.0;
     // for _ in 0..iterations {
